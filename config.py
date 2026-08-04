@@ -33,7 +33,7 @@ TOKENS = {
     "XNM": {
         "mint": "XNMbEwZFFBKQhqyW3taa8cAUp1xBUHfyzRFJQvZET4m",
         "decimals": 9,
-        "pool": None,
+        "pool": "8EUkm5ChdmLm9pxKX3Q99APck1URfVqP9m9R3FQcP6Tb",  # x1.ninja/pair/...
     },
     "USDC.x": {
         "mint": "B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq",

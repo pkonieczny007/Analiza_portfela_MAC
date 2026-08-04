@@ -3,3 +3,4 @@ __pycache__/
 portfel.db
 .env
 venv/
+prompt_folder/

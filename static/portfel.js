@@ -29,9 +29,15 @@ async function api(path, opts = {}) {
   return data;
 }
 
+let XNT_USD = null; // kurs XNT->USD (moze byc syntetyczny)
+
 async function load() {
   const data = await api("/api/balances" + (SHOW_HIDDEN ? "?hidden=1" : ""));
+  XNT_USD = data.xnt_usd;
   $("#total").textContent = fmt(data.total_xnt, 2);
+  $("#total-usd").textContent = XNT_USD
+    ? `≈ ${fmt(data.total_xnt * XNT_USD, 2)} USDC.x (orientacyjnie)`
+    : "(brak kursu USD)";
   renderWallets(data);
   renderTokens(data);
   drawPie(data.items.filter(it => it.value_xnt > 0));
@@ -88,14 +94,24 @@ function renderWallets(data) {
 }
 
 function renderTokens(data) {
-  $("#tbl-bal tbody").innerHTML = data.items.map(it => `
+  const usd = (v) => (XNT_USD && v != null) ? fmt(v * XNT_USD, 2) : "—";
+  const rows = data.items.map(it => `
     <tr>
       <td><b>${it.symbol}</b></td>
       <td class="r mono">${fmt(it.amount, 4)}</td>
       <td class="r mono">${it.price_xnt != null ? fmt(it.price_xnt, 7) : "<span class='muted'>brak puli</span>"}</td>
       <td class="r mono">${fmt(it.value_xnt, 3)}</td>
+      <td class="r mono">${usd(it.value_xnt)}</td>
       <td class="r mono">${it.pct != null ? it.pct.toFixed(1) + " %" : "—"}</td>
-    </tr>`).join("");
+    </tr>`);
+  const total_usd = XNT_USD ? fmt(data.total_xnt * XNT_USD, 2) : "—";
+  rows.push(`<tr style="border-top:2px solid var(--border)">
+      <td><b>RAZEM</b></td><td></td><td></td>
+      <td class="r mono"><b>${fmt(data.total_xnt, 3)}</b></td>
+      <td class="r mono"><b>${total_usd}</b></td>
+      <td class="r mono">100 %</td>
+    </tr>`);
+  $("#tbl-bal tbody").innerHTML = rows.join("");
 }
 
 function drawPie(items) {
