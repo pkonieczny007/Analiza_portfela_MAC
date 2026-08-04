@@ -1,0 +1,84 @@
+potrzebuję narzędzia do śledzenia moich transakcji 
+na początek portfela:
+76stGq9jx2WsBtdsAREj6UAw9B4Gg9eDYK3NUezWNFF1
+
+chcę używać na tym adresie bota:
+C:\XEN\BOT_TRADINGOWY\BOT_AGG1
+
+Narzędzie teraz jest osobne, ale w przyszłości gdy bedzie dopracowane,
+planuje wrzucic jest do aplikacji bota. 
+w celu zarządzania pozycjami i w celach informacyjnych. 
+
+
+
+Cel:
+
+1. śledzenie transakcji kupno i sprzedaż i tworzenie par - kupno - sprzedaż.
+z mozliwoscia dopasowywania transakcji do siebie po okreslonej cenie.
+przykład:
+
+robię transakcje kupna 
+- 1000 anl za 0,00118 anl/xnt
+- 200 anl za 0,0012
+- 500 anl za 0,001
+
+nastepnie robie sprzedaż:
+- 500 anl za 0,002 - wtedy dopasujemy automatycznie pare do transakcji.
+po koleji zamykając. więc mamy 1000anl kupione 500/1000 sprzedane. tam liczymy zysk, srednia i widzimy wizualnie na malym pasku. ale to propozycja. i mamy mozliwosc te 500 wrzucenia do ostatniej transakcji. 
+
+
+dodatkowo liczone średnie zakupy. możliwość grupowania pozycji i liczenie średniej z grupy. liczenie zysku straty na parze, grupie i calosci.
+
+
+drugi przykład:
+mamy kupno:
+ 2000 anl za 0,0013 anl/xnt
+ 100 anl za 0,0014 anl/xnt
+
+ i sprzedajemy:
+ 500anl za 0,002
+ 1700 anl za 0,0021
+
+wtedy mamy 
+2000/2000 
+100/100
+
+i zostaje nam 
+100 sell za 0,0014 i gdy kupimy para sie wypełnia
+
+np. buy za 0,001 200 anl, wypelnia nam sell 
+i  zostaje nam jeszcze troche. i tak w obie strony.
+
+
+Na początku interesuje nas ANL i XNT. 
+ale też możliwość przełączania przeliczenia ceny średniej na usdc.x
+ale glownie mnie interesuje ANL+XNT
+
+potem zrobimy XNM i ANL i XNT. ale najpierw przetestujemy ANL+XNT/
+
+Dane pobieramy z x1.ninja lub blockchain 
+
+możemy dodawac nazwy grup. przesuwac pozycje. i wybierac inne wolne pule. 
+
+2. druga opcje to proste śledzenie ilości kryptowalut na portfelu, takie narzędzie już mam, ale tu chce w osobnej zakładce. ale priorytetem jest punkt pierwszy. wiec to  zrobimy w drugiej kolejności
+ANL - EFPkbXTdr3c7aRbCEKoJDYdbbzgzVDBShYGybP3gQwmy
+XNT - So11111111111111111111111111111111111111112 (to jest fork solany a xnt jest jak SOL na SOLANIE)
+XNM - XNMbEwZFFBKQhqyW3taa8cAUp1xBUHfyzRFJQvZET4m
+USDC.x - B69chRzqzDCmdB5WYB8NRu5Yv5ZA95ABiZcdzCgGm9Tq
+
+i Proporcji procentowych 
+tych 4 krypto wobec siebie w przeliczeniu do sumy w xnt.
+przeliczenie nie musi byc super dokładne. 
+tylko orientacyjne, bardziej chodzi mi o proporcje. 
+wiec ceny moga byc syntetyczne dla par z niskim pool.
+
+Opcja widoku wykresu kołowego
+
+
+
+Zacznij od punktu 1 i zrob prototyp calosci we flask. 
+Głównie skup sie na 1 punkcie. 
+
+Przeanalziuj projekt bota. bo tam masz dane na temat sieci itp. 
+
+

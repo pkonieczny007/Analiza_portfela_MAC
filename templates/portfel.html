@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Portfel — salda i proporcje{% endblock %}
+{% block content %}
+
+<section class="toolbar">
+  <div class="pricebox"><span class="label">Suma portfela</span>
+    <span id="total" class="mono big">—</span> <span class="muted">XNT (orientacyjnie)</span>
+  </div>
+  <div class="actions"><button id="btn-refresh" class="btn primary">↻ Odśwież</button></div>
+</section>
+
+<div class="cols">
+  <section class="card">
+    <div class="card-head"><h2>Salda</h2></div>
+    <table class="tbl" id="tbl-bal">
+      <thead><tr>
+        <th>Token</th><th class="r">Ilość</th><th class="r">Cena [XNT]</th>
+        <th class="r">Wartość [XNT]</th><th class="r">Udział</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="muted small-note">Wycena orientacyjna — ceny syntetyczne z pul o niskiej płynności.
+    Tokeny bez skonfigurowanej puli nie wchodzą do proporcji.</p>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Proporcje (w XNT)</h2></div>
+    <canvas id="pie" width="380" height="380"></canvas>
+    <div id="legend" class="legend"></div>
+  </section>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='portfel.js') }}"></script>
+{% endblock %}

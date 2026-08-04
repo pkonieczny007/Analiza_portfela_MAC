@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Pary transakcji — {{ token }}/XNT{% endblock %}
+{% block content %}
+
+<section class="toolbar">
+  <div class="pricebox">
+    <span class="label">{{ token }}/XNT</span>
+    <span id="price" class="mono big">—</span>
+    <span id="price-usd" class="muted mono"></span>
+  </div>
+  <div class="actions">
+    <label class="switch">
+      <input type="checkbox" id="unit-usd">
+      <span>ceny w USDC.x</span>
+    </label>
+    <button id="btn-sync" class="btn primary">⛓ Synchronizuj z blockchain</button>
+    <button id="btn-automatch" class="btn">⚡ Auto-dopasuj (FIFO)</button>
+    <button id="btn-clear-matches" class="btn danger-ghost">✕ Wyczyść dopasowania</button>
+  </div>
+</section>
+
+<section class="kpis" id="kpis"></section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Grupy</h2>
+    <form id="form-group" class="inline">
+      <input id="group-name" placeholder="nazwa nowej grupy">
+      <button class="btn small">+ Dodaj</button>
+    </form>
+  </div>
+  <div id="groups" class="groups"></div>
+</section>
+
+<div class="cols">
+  <section class="card">
+    <div class="card-head"><h2>Kupna</h2><span id="buys-summary" class="muted"></span></div>
+    <table class="tbl" id="tbl-buys">
+      <thead><tr>
+        <th>Data</th><th class="r">Ilość</th><th class="r">Cena</th><th class="r">Wartość</th>
+        <th>Sprzedano</th><th class="r">PnL zreal.</th><th>Grupa</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Sprzedaże</h2><span id="sells-summary" class="muted"></span></div>
+    <table class="tbl" id="tbl-sells">
+      <thead><tr>
+        <th>Data</th><th class="r">Ilość</th><th class="r">Cena</th><th class="r">Wartość</th>
+        <th>Dopasowano</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>Ręczne operacje</h2></div>
+  <div class="manual">
+    <form id="form-match" class="inline">
+      <b>Dopasuj parę:</b>
+      <select id="match-buy"></select>
+      <select id="match-sell"></select>
+      <input id="match-qty" type="number" step="any" placeholder="ilość (puste = max)">
+      <button class="btn small">Połącz</button>
+    </form>
+    <form id="form-tx" class="inline">
+      <b>Dodaj transakcję:</b>
+      <select id="tx-side"><option value="buy">kupno</option><option value="sell">sprzedaż</option></select>
+      <input id="tx-qty" type="number" step="any" placeholder="ilość {{ token }}" required>
+      <input id="tx-price" type="number" step="any" placeholder="cena XNT/{{ token }}" required>
+      <input id="tx-date" type="datetime-local">
+      <button class="btn small">+ Dodaj</button>
+    </form>
+  </div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script>window.TOKEN = "{{ token }}";</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}
