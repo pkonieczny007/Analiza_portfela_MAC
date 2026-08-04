@@ -11,6 +11,7 @@
     <span class="brand">📊 Analiza portfela <b>MAC</b></span>
     <a href="/" class="{{ 'active' if request.path == '/' else '' }}">Pary transakcji</a>
     <a href="/portfel" class="{{ 'active' if request.path == '/portfel' else '' }}">Portfel</a>
+    <a href="/multibot" class="{{ 'active' if request.path == '/multibot' else '' }}">MultiBOT</a>
     <span class="wallet mono" title="{{ wallet }}">{{ wallet[:4] }}…{{ wallet[-4:] }}</span>
   </nav>
   <main>{% block content %}{% endblock %}</main>

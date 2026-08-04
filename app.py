@@ -14,6 +14,8 @@ import chain
 import config
 import db as dbm
 import matching
+import multibot
+import trading
 import xlsx_export
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -47,6 +49,13 @@ def index():
 @app.get("/portfel")
 def portfel():
     return render_template("portfel.html", wallet=config.WALLET)
+
+
+@app.get("/multibot")
+def multibot_page():
+    return render_template("multibot.html", wallet=config.WALLET,
+                           token=config.ACTIVE_TOKEN,
+                           max_slices=config.MULTIBOT_MAX_SLICES)
 
 
 # ---------------------------------------------------------------- API: stan
@@ -322,6 +331,187 @@ def api_group_delete(group_id: int):
     return jsonify({"ok": True})
 
 
+# ---------------------------------------------------------------- API: handel
+
+def _trade_settings(con) -> dict:
+    dry = dbm.meta_get(con, "trade_dry_run")
+    slip = dbm.meta_get(con, "trade_slippage_bps")
+    return {
+        "dry_run": config.DRY_RUN_DEFAULT if dry is None or dry == "" else dry == "1",
+        "slippage_bps": int(slip) if slip else config.SLIPPAGE_BPS_DEFAULT,
+        "available": trading.is_available(),
+    }
+
+
+@app.get("/api/trade/settings")
+def api_trade_settings_get():
+    with dbm.connect() as con:
+        s = _trade_settings(con)
+    s["keys"] = [k.__dict__ for k in trading.list_keys()]
+    return jsonify(s)
+
+
+@app.post("/api/trade/settings")
+def api_trade_settings_set():
+    body = request.get_json(force=True)
+    with dbm.connect() as con:
+        if "dry_run" in body:
+            dbm.meta_set(con, "trade_dry_run", "1" if body["dry_run"] else "0")
+        if "slippage_bps" in body:
+            bps = max(0, min(5000, int(body["slippage_bps"])))
+            dbm.meta_set(con, "trade_slippage_bps", str(bps))
+        con.commit()
+        return jsonify(_trade_settings(con))
+
+
+@app.post("/api/trade")
+def api_trade():
+    """Market buy/sell. Wymaga confirm:true — bez tego tylko wycena (podglad)."""
+    body = request.get_json(force=True)
+    side = (body.get("side") or "").lower()
+    token = body.get("token", config.ACTIVE_TOKEN)
+    key_file = body.get("key_file") or ""
+    try:
+        amount = float(body.get("amount") or 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Zla ilosc"}), 400
+    if side not in ("buy", "sell") or amount <= 0:
+        return jsonify({"error": "Wymagane: side buy/sell oraz amount > 0"}), 400
+    if not key_file:
+        return jsonify({"error": "Wybierz klucz z katalogu wallet/"}), 400
+
+    price = _get_price(refresh=True)["price_xnt"]
+    if not price:
+        return jsonify({"error": "Brak ceny rynkowej — nie moge policzyc ochrony poslizgu"}), 502
+
+    # Jednostka wpisanej ilosci: 'xnt' albo 'token'. Gdy uzytkownik podal ilosc
+    # w jednostce OTRZYMYWANEJ, przeliczamy ja na wydawana biezaca cena
+    # (orientacyjnie — AMM policzy dokladnie przy wykonaniu).
+    spend_sym = "XNT" if side == "buy" else token
+    get_sym = token if side == "buy" else "XNT"
+    unit = (body.get("amount_unit") or "").lower()
+    unit_sym = "XNT" if unit == "xnt" else (token if unit == "token" else spend_sym)
+    requested = {"amount": amount, "symbol": unit_sym}
+    if unit_sym != spend_sym:
+        amount = amount * price if side == "buy" else amount / price
+
+    with dbm.connect() as con:
+        settings = _trade_settings(con)
+    if not settings["available"]:
+        return jsonify({"error": "Brak biblioteki 'solders' — pip install solders"}), 501
+
+    try:
+        keypair = trading.find_key(key_file)
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)}), 400
+    pubkey = str(keypair.pubkey())
+
+    # Ochrona przed bledem przecinka: sprawdz saldo strony wydawanej.
+    balances = chain.wallet_balances(pubkey)
+    have = balances.get(spend_sym, 0.0)
+    if side == "buy":
+        have = max(0.0, have - 0.01)  # rezerwa na oplaty
+    if amount > have:
+        return jsonify({
+            "error": f"Za malo srodkow: chcesz wydac {amount:g} {spend_sym}, "
+                     f"dostepne {have:.6f} {spend_sym} (portfel {pubkey[:6]}…)"
+        }), 400
+
+    expected = amount / price if side == "buy" else amount * price
+    preview = {
+        "side": side, "token": token, "amount": amount, "price_xnt": price,
+        "expected_out": expected, "spend_symbol": spend_sym, "get_symbol": get_sym,
+        "pubkey": pubkey, "balance": have, "requested": requested,
+        "converted": unit_sym != spend_sym,
+        "slippage_bps": settings["slippage_bps"], "dry_run": settings["dry_run"],
+    }
+    if not body.get("confirm"):
+        preview["preview"] = True
+        return jsonify(preview)
+
+    try:
+        res = trading.execute_swap(
+            symbol=token, side=side, amount=amount, price_xnt=price, keypair=keypair,
+            slippage_bps=settings["slippage_bps"], dry_run=settings["dry_run"],
+        )
+    except Exception as e:  # noqa: BLE001
+        log.exception("swap failed")
+        return jsonify({"error": str(e)}), 502
+    return jsonify({**preview, "signature": res.signature, "dry_run": res.dry_run,
+                    "min_out": res.min_out, "note": res.note})
+
+
+# ---------------------------------------------------------------- API: MultiBOT
+
+def _price_for(token: str) -> float | None:
+    if token == config.ACTIVE_TOKEN:
+        return _get_price()["price_xnt"]
+    pool = config.TOKENS.get(token, {}).get("pool")
+    return chain.pool_price_xnt(pool) if pool else None
+
+
+@app.get("/api/multibot")
+def api_multibot_list():
+    return jsonify({
+        "orders": multibot.list_orders(request.args.get("hidden") == "1"),
+        "max_slices": config.MULTIBOT_MAX_SLICES,
+    })
+
+
+@app.post("/api/multibot")
+def api_multibot_create():
+    body = request.get_json(force=True)
+    try:
+        now = int(time.time())
+        start = int(body.get("window_start") or now)
+        end = int(body.get("window_end") or (start + 1800))
+        with dbm.connect() as con:
+            settings = _trade_settings(con)
+        oid = multibot.create_order(
+            side=body.get("side"), token=body.get("token", config.ACTIVE_TOKEN),
+            key_file=body.get("key_file") or "",
+            total_amount=float(body.get("total_amount") or 0),
+            num_slices=int(body.get("num_slices") or 1),
+            window_start=start, window_end=end,
+            price_min=_optional_float(body.get("price_min")),
+            price_max=_optional_float(body.get("price_max")),
+            trigger_mode=body.get("trigger_mode", "time_price"),
+            weights=body.get("weights"), offsets=body.get("offsets"),
+            slippage_bps=settings["slippage_bps"], dry_run=settings["dry_run"],
+            note=body.get("note"),
+        )
+    except (ValueError, FileNotFoundError) as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"id": oid})
+
+
+def _optional_float(v):
+    if v in (None, "", "null"):
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+@app.post("/api/multibot/<int:oid>/cancel")
+def api_multibot_cancel(oid: int):
+    multibot.cancel_order(oid)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/multibot/<int:oid>/hide")
+def api_multibot_hide(oid: int):
+    r = multibot.set_hidden(oid, bool((request.get_json(silent=True) or {}).get("hidden", True)))
+    return (jsonify(r), 400) if "error" in r else jsonify(r)
+
+
+@app.delete("/api/multibot/<int:oid>")
+def api_multibot_delete(oid: int):
+    r = multibot.delete_order(oid)
+    return (jsonify(r), 400) if "error" in r else jsonify(r)
+
+
 # ---------------------------------------------------------------- API: eksport
 
 @app.get("/api/export.xlsx")
@@ -558,4 +748,6 @@ def api_balances():
 
 
 if __name__ == "__main__":
+    config.WALLET_DIR.mkdir(exist_ok=True)
+    multibot.start_scheduler(_price_for)
     app.run(host=config.UI_HOST, port=config.UI_PORT, debug=False)

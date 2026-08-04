@@ -4,3 +4,9 @@ portfel.db
 .env
 venv/
 prompt_folder/
+
+# KLUCZE PRYWATNE — nigdy nie commitowac
+wallet/*
+!wallet/README.md
+*.keypair.json
+id*.json

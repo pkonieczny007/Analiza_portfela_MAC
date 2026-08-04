@@ -427,5 +427,144 @@ $("#form-tx").addEventListener("submit", async (e) => {
   } catch (err) { toast(err.message, "err"); }
 });
 
+// ---------------------------------------------------------------- handel
+
+let TRADE = { side: "buy", unit: "xnt", settings: null, pending: null };
+
+async function loadTradeSettings() {
+  const s = await api("/api/trade/settings");
+  TRADE.settings = s;
+  const modeEl = $("#trade-mode");
+  modeEl.textContent = s.dry_run ? "DRY-RUN (nic nie wysyłamy)" : "LIVE — realne środki";
+  modeEl.className = "mode-badge " + (s.dry_run ? "dry" : "live");
+  $("#trade-live").checked = !s.dry_run;
+  $("#trade-slippage").value = s.slippage_bps;
+
+  const keySel = $("#trade-key");
+  keySel.innerHTML = s.keys.length
+    ? s.keys.map(k => `<option value="${k.filename}">${esc(k.name)} — ${esc(k.pubkey.slice(0, 6))}…${esc(k.pubkey.slice(-4))}</option>`).join("")
+    : `<option value="">brak kluczy w katalogu wallet/</option>`;
+
+  const warn = $("#trade-unavailable");
+  const problems = [];
+  if (!s.available) problems.push("Brak biblioteki <b>solders</b> — <code>pip install solders</code>.");
+  if (!s.keys.length) problems.push("Brak kluczy — wrzuć plik JSON (format solana-cli) do katalogu <code>wallet/</code>.");
+  warn.innerHTML = problems.join("<br>");
+  warn.style.display = problems.length ? "" : "none";
+  $("#trade-submit").disabled = !!problems.length;
+}
+
+function spendSymbol() { return TRADE.side === "buy" ? "XNT" : window.TOKEN; }
+function unitSymbol() { return TRADE.unit === "xnt" ? "XNT" : window.TOKEN; }
+
+function renderTradeUnit() {
+  const spend = spendSymbol();
+  const sym = unitSymbol();
+  $("#trade-unit-btn").textContent = sym;
+  $("#trade-unit-btn").classList.toggle("converted", sym !== spend);
+  const price = STATE?.price?.price_xnt;
+  const amt = parseFloat($("#trade-amount").value);
+  let hint = sym === spend
+    ? `— ile ${TRADE.side === "buy" ? "wydajesz" : "sprzedajesz"} (${sym})`
+    : `— ile chcesz ${TRADE.side === "buy" ? "kupić" : "otrzymać"} (${sym}), przeliczymy na ${spend}`;
+  if (sym !== spend && price && amt > 0) {
+    const conv = TRADE.side === "buy" ? amt * price : amt / price;
+    hint += ` ≈ ${conv.toLocaleString("pl-PL", { maximumFractionDigits: 6 })} ${spend}`;
+  }
+  $("#trade-unit-hint").textContent = hint;
+}
+
+function setTradeSide(side) {
+  TRADE.side = side;
+  TRADE.unit = side === "buy" ? "xnt" : "token"; // domyslnie jednostka wydawana
+  document.querySelectorAll("#trade-side button").forEach(b =>
+    b.classList.toggle("on", b.dataset.side === side));
+  TRADE.pending = null;
+  $("#trade-submit").textContent = "Sprawdź i wykonaj";
+  renderTradeUnit();
+}
+
+document.querySelectorAll("#trade-side button").forEach(b =>
+  b.addEventListener("click", () => setTradeSide(b.dataset.side)));
+
+$("#trade-unit-btn").addEventListener("click", () => {
+  TRADE.unit = TRADE.unit === "xnt" ? "token" : "xnt";
+  TRADE.pending = null;
+  $("#trade-submit").textContent = "Sprawdź i wykonaj";
+  renderTradeUnit();
+});
+$("#trade-amount").addEventListener("input", renderTradeUnit);
+
+$("#trade-live").addEventListener("change", async (e) => {
+  const live = e.target.checked;
+  if (live && !confirm("Włączyć tryb LIVE? Kolejne zlecenia wydadzą PRAWDZIWE środki z portfela.")) {
+    e.target.checked = false;
+    return;
+  }
+  await api("/api/trade/settings", { method: "POST", body: { dry_run: !live } });
+  await loadTradeSettings();
+  toast(live ? "Tryb LIVE włączony" : "Tryb DRY-RUN włączony", live ? "err" : "ok");
+});
+
+$("#trade-slippage").addEventListener("change", async (e) => {
+  await api("/api/trade/settings", { method: "POST", body: { slippage_bps: +e.target.value } });
+  await loadTradeSettings();
+});
+
+$("#form-trade").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const amount = parseFloat($("#trade-amount").value);
+  const key_file = $("#trade-key").value;
+  if (!(amount > 0)) return toast("Podaj ilość", "err");
+  if (!key_file) return toast("Brak klucza w katalogu wallet/", "err");
+
+  const body = { side: TRADE.side, token: window.TOKEN, amount, key_file,
+                 amount_unit: TRADE.unit };
+  const same = TRADE.pending && TRADE.pending.side === TRADE.side &&
+               TRADE.pending.amount === amount && TRADE.pending.key_file === key_file &&
+               TRADE.pending.amount_unit === TRADE.unit;
+
+  try {
+    if (!same) {
+      const p = await api("/api/trade", { method: "POST", body });
+      TRADE.pending = { ...body };
+      const conv = p.converted
+        ? `<span class="muted">(podałeś ${p.requested.amount} ${p.requested.symbol} → przeliczone)</span> ` : "";
+      $("#trade-preview").innerHTML = `
+        <b>${p.side === "buy" ? "KUPNO" : "SPRZEDAŻ"}</b>: ${conv}
+        wydajesz <b>${p.amount.toLocaleString("pl-PL", { maximumFractionDigits: 6 })} ${p.spend_symbol}</b>,
+        dostaniesz ok. <b>${p.expected_out.toLocaleString("pl-PL", { maximumFractionDigits: 4 })} ${p.get_symbol}</b>
+        po cenie ${p.price_xnt.toFixed(7)} XNT.<br>
+        Portfel ${esc(p.pubkey.slice(0, 8))}… (saldo ${p.balance.toFixed(4)} ${p.spend_symbol}),
+        poślizg ${p.slippage_bps} bps, tryb <b>${p.dry_run ? "DRY-RUN" : "LIVE"}</b>.<br>
+        <span class="${p.dry_run ? "" : "pnl-neg"}">Kliknij „Potwierdź" aby ${p.dry_run ? "wykonać próbę" : "WYSŁAĆ TRANSAKCJĘ"}.</span>`;
+      $("#trade-submit").textContent = "✔ Potwierdź";
+      return;
+    }
+    const r = await api("/api/trade", { method: "POST", body: { ...body, confirm: true } });
+    TRADE.pending = null;
+    $("#trade-submit").textContent = "Sprawdź i wykonaj";
+    $("#trade-amount").value = "";
+    if (r.dry_run) {
+      $("#trade-preview").innerHTML = `✅ DRY-RUN OK — ${esc(r.note)}. Nic nie wysłano.`;
+      toast("DRY-RUN wykonany", "ok");
+    } else {
+      $("#trade-preview").innerHTML = `✅ Wysłano! Sygnatura: <span class="mono">${esc(r.signature)}</span>
+        <br>Min. otrzymasz: ${r.min_out.toLocaleString("pl-PL", { maximumFractionDigits: 4 })} ${r.get_symbol}.
+        Kliknij „Synchronizuj", aby transakcja trafiła do par.`;
+      toast("Transakcja wysłana", "ok");
+    }
+  } catch (err) {
+    TRADE.pending = null;
+    $("#trade-submit").textContent = "Sprawdź i wykonaj";
+    $("#trade-preview").innerHTML = `<span class="pnl-neg">✕ ${esc(err.message)}</span>`;
+    toast(err.message, "err");
+  }
+});
+
+setTradeSide("buy");
+loadTradeSettings().catch(e => toast("Handel niedostępny: " + e.message, "err"));
+document.getElementById("form-trade").addEventListener("reset", renderTradeUnit);
+
 load().catch(e => toast("Błąd ładowania: " + e.message, "err"));
 setInterval(() => load().catch(() => {}), 30000);

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}MultiBOT — {{ token }}/XNT{% endblock %}
+{% block content %}
+
+<section class="toolbar">
+  <div class="pricebox">
+    <span class="label">{{ token }}/XNT</span>
+    <span id="mb-price" class="mono big">—</span>
+  </div>
+  <div class="actions">
+    <span id="mb-mode" class="mode-badge">—</span>
+    <label class="switch"><input type="checkbox" id="mb-show-hidden"><span>pokaż ukryte</span></label>
+    <button id="mb-refresh" class="btn">↻ Odśwież</button>
+  </div>
+</section>
+
+<div class="cols">
+  <section class="card">
+    <div class="card-head"><h2>⧉ Nowe zlecenie MultiBOT</h2></div>
+    <p class="muted small-note" style="margin-top:0">
+      Jedno duże zlecenie dzielone na <b>N transz</b> rozłożonych w oknie czasowym.
+      Transza wykona się, gdy spełni warunek wyzwalacza (czas i/lub cena).
+    </p>
+
+    <div id="mb-unavailable" class="muted" style="display:none"></div>
+
+    <form id="mb-form" class="trade-form-col">
+      <div class="seg" id="mb-side">
+        <button type="button" data-side="buy" class="on">KUPNO (XNT → {{ token }})</button>
+        <button type="button" data-side="sell">SPRZEDAŻ ({{ token }} → XNT)</button>
+      </div>
+
+      <div class="form-grid2">
+        <label class="field">Klucz podpisujący<select id="mb-key"></select></label>
+        <label class="field">Ilość łączna <span id="mb-unit" class="muted">XNT</span>
+          <input id="mb-amount" type="number" step="any" required placeholder="np. 1.5"></label>
+        <label class="field">Liczba transz
+          <input id="mb-slices" type="number" step="1" min="1" max="{{ max_slices }}" value="5"></label>
+      </div>
+
+      <label class="field">Wyzwalacz transz
+        <div class="seg" id="mb-trigger">
+          <button type="button" data-trig="time_price" class="on">Czasowo-cenowy</button>
+          <button type="button" data-trig="time">Czasowy</button>
+          <button type="button" data-trig="price">Cenowy</button>
+        </div>
+      </label>
+      <div class="muted small-note" id="mb-trigger-help"></div>
+
+      <div class="form-grid2" id="mb-range-box">
+        <label class="field">Cena min (XNT/{{ token }})
+          <input id="mb-pmin" type="number" step="any" placeholder="bez ograniczenia"></label>
+        <label class="field">Cena max (XNT/{{ token }})
+          <input id="mb-pmax" type="number" step="any" placeholder="bez ograniczenia"></label>
+      </div>
+
+      <div class="form-grid2">
+        <label class="field">Start za (min)<input id="mb-start-in" type="number" step="1" min="0" value="0"></label>
+        <label class="field">Czas trwania (min)<input id="mb-window" type="number" step="1" min="1" value="30"></label>
+      </div>
+
+      <label class="field">Notatka<input id="mb-note" placeholder="opcjonalnie"></label>
+
+      <div id="mb-preview" class="trade-preview muted"></div>
+      <button class="btn primary" id="mb-submit">Uruchom MultiBOT</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>⌗ Podgląd planu transz</h2></div>
+    <div id="mb-plan" class="muted">Uzupełnij formularz, aby zobaczyć rozkład transz.</div>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>☰ Zlecenia</h2></div>
+  <div id="mb-orders" class="muted">brak zleceń</div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script>window.TOKEN = "{{ token }}"; window.MAX_SLICES = {{ max_slices }};</script>
+<script src="{{ url_for('static', filename='multibot.js') }}"></script>
+{% endblock %}

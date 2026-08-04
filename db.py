@@ -47,6 +47,40 @@ CREATE TABLE IF NOT EXISTS wallet (
     hidden INTEGER NOT NULL DEFAULT 0,
     selected INTEGER NOT NULL DEFAULT 1
 );
+CREATE TABLE IF NOT EXISTS multi_order (
+    id INTEGER PRIMARY KEY,
+    created_at INTEGER NOT NULL,
+    side TEXT NOT NULL CHECK(side IN ('buy','sell')),
+    token TEXT NOT NULL,
+    key_file TEXT NOT NULL,
+    total_amount REAL NOT NULL,
+    amount_unit TEXT NOT NULL,
+    num_slices INTEGER NOT NULL,
+    price_min REAL,
+    price_max REAL,
+    trigger_mode TEXT NOT NULL DEFAULT 'time_price',
+    window_start INTEGER NOT NULL,
+    window_end INTEGER NOT NULL,
+    slippage_bps INTEGER NOT NULL DEFAULT 300,
+    dry_run INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'running',
+    note TEXT,
+    hidden INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS multi_slice (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES multi_order(id) ON DELETE CASCADE,
+    idx INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    scheduled_at INTEGER NOT NULL,
+    price_offset_pct REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    executed_price REAL,
+    tx_signature TEXT,
+    filled_at INTEGER,
+    error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_slice_order ON multi_slice(order_id);
 CREATE INDEX IF NOT EXISTS idx_tx_token_time ON tx(token, block_time);
 CREATE INDEX IF NOT EXISTS idx_match_buy ON match(buy_id);
 CREATE INDEX IF NOT EXISTS idx_match_sell ON match(sell_id);

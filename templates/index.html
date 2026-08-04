@@ -96,6 +96,45 @@
   </div>
 </section>
 
+<section class="card trade-card">
+  <div class="card-head">
+    <h2>💱 Kupno / sprzedaż {{ token }} (XDEX)</h2>
+    <div class="inline">
+      <span id="trade-mode" class="mode-badge">—</span>
+      <label class="switch" title="DRY-RUN buduje transakcję, ale jej NIE wysyła">
+        <input type="checkbox" id="trade-live"><span>tryb LIVE (realne środki)</span>
+      </label>
+      <label class="inline muted" style="gap:4px">poślizg
+        <input id="trade-slippage" type="number" step="1" min="0" max="5000" style="width:70px"> bps
+      </label>
+    </div>
+  </div>
+
+  <div id="trade-unavailable" class="muted" style="display:none"></div>
+
+  <form id="form-trade" class="trade-form">
+    <div class="seg" id="trade-side">
+      <button type="button" data-side="buy" class="on">KUPNO (XNT → {{ token }})</button>
+      <button type="button" data-side="sell">SPRZEDAŻ ({{ token }} → XNT)</button>
+    </div>
+    <label class="field">Klucz podpisujący
+      <select id="trade-key"></select>
+    </label>
+    <label class="field">Ilość <span id="trade-unit-hint" class="muted"></span>
+      <div class="inline" style="gap:6px">
+        <input id="trade-amount" type="number" step="any" placeholder="0.0" required>
+        <button type="button" id="trade-unit-btn" class="btn small unit-btn"
+                title="przełącz jednostkę: podaj ilość w XNT albo w {{ token }}">XNT</button>
+      </div>
+    </label>
+    <button class="btn primary" id="trade-submit">Sprawdź i wykonaj</button>
+  </form>
+  <div id="trade-preview" class="trade-preview muted">
+    Ilość dla kupna podajesz w XNT (ile wydajesz), dla sprzedaży w {{ token }} (ile sprzedajesz).
+    Najpierw zobaczysz wycenę do potwierdzenia.
+  </div>
+</section>
+
 {% endblock %}
 {% block scripts %}
 <script>window.TOKEN = "{{ token }}";</script>

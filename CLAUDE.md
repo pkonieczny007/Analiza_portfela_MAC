@@ -52,6 +52,36 @@ dopasowan — **nigdy nie kasuje transakcji**:
 Typowy scenariusz „kontroluje od dzis": ustaw filtr od dzis -> Wyczysc
 dopasowania -> Auto-dopasuj.
 
+## Handel (swap XDEX) i MultiBOT
+
+`trading.py` — port `BOT_AGG1/app/chain/xdex_client.py`: ta sama instrukcja
+(dyskryminator `8fbe5adac41e33de`, 13 kont, args `u64 amount_in|u64 min_out`),
+to samo opakowanie WXNT (create ATA idempotent + transfer + sync_native
++ close_account na koncu). **Roznica: synchronicznie, przez surowy JSON-RPC
+`sendTransaction`** (base64 podpisanej VersionedTransaction) zamiast
+solana-py AsyncClient. Wymaga `solders` (zainstalowany dla py3.13).
+
+Parametry puli: dla ANL z `config.TOKENS` (przepisane z bota), dla reszty
+wyprowadzane z konta puli (`POOL_OFFSETS`, strona XNT rozpoznawana po mincie
+w koncie vaultu, token_program = wlasciciel konta mintu). Sprawdzone: XNM
+wyprowadza sie poprawnie.
+
+Klucze: pliki JSON solana-cli w `wallet/` (`wallet/*` w .gitignore poza
+README). Do UI trafia tylko nazwa pliku + pubkey — nigdy sekret.
+
+Bezpieczniki: DRY-RUN domyslnie (przelacznik w UI -> `meta.trade_dry_run`,
+wlaczenie LIVE wymaga potwierdzenia), min_out z poslizgiem (`meta.trade_slippage_bps`,
+domyslnie 300 bps), sprawdzenie salda przed zleceniem (przy buy rezerwa 0.01 XNT
+na oplaty), dwustopniowe zatwierdzanie w UI (`confirm:true` w `POST /api/trade`;
+bez niego endpoint zwraca sama wycene).
+
+`multibot.py` — port `BOT_AGG1/app/trading/multibot.py` na SQLite
+(`multi_order`/`multi_slice`) + `threading.Thread` co `MULTIBOT_POLL_S`
+zamiast async schedulera. Zachowana logika transz: podzial kwoty (wagi lub
+rowno, ostatnia bierze reszte), okno czasowe, wyzwalacze time/price/time_price,
+offset % per transza, `skipped` gdy okno minelo. Scheduler startuje w
+`app.py:__main__` (nie przy imporcie — inaczej odpalilby sie w kazdym workerze).
+
 ## Portfele (multi-wallet)
 
 Tabela `wallet` (address UNIQUE, name, grp, sort, hidden, selected) +
