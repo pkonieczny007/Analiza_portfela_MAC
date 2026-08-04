@@ -37,16 +37,42 @@ def remaining_map(con: sqlite3.Connection, token: str) -> dict[int, float]:
     return out
 
 
-def auto_match(con: sqlite3.Connection, token: str, strategy: str = "fifo") -> int:
+def _range_sql(t_from: int | None, t_to: int | None) -> tuple[str, list]:
+    sql, params = "", []
+    if t_from is not None:
+        sql += " AND block_time>=?"
+        params.append(t_from)
+    if t_to is not None:
+        sql += " AND block_time<=?"
+        params.append(t_to)
+    return sql, params
+
+
+def _wallet_sql(wallet_ids: list[int] | None) -> tuple[str, list]:
+    if wallet_ids is None:
+        return "", []
+    if not wallet_ids:
+        return " AND 0", []  # nic nie zaznaczono -> pusty zbior
+    ph = ",".join("?" * len(wallet_ids))
+    return f" AND wallet_id IN ({ph})", list(wallet_ids)
+
+
+def auto_match(con: sqlite3.Connection, token: str, strategy: str = "fifo",
+               t_from: int | None = None, t_to: int | None = None,
+               wallet_ids: list[int] | None = None) -> int:
     """Dopasowuje otwarte ilosci chronologicznie. Zwraca liczbe nowych par.
 
     strategy: 'fifo' (najstarsze kupno pierwsze) lub 'lifo' (najnowsze pierwsze).
-    Istniejace dopasowania (takze reczne) sa zachowane.
+    Istniejace dopasowania (takze reczne) sa zachowane. Przy aktywnym filtrze
+    dat/portfeli parowane sa tylko transakcje z zakresu — reszta nietknieta.
     """
     rem = remaining_map(con, token)
+    rsql, rparams = _range_sql(t_from, t_to)
+    wsql, wparams = _wallet_sql(wallet_ids)
     txs = con.execute(
-        "SELECT id, side, block_time FROM tx WHERE token=? AND hidden=0 ORDER BY block_time, id",
-        (token,),
+        f"SELECT id, side, block_time FROM tx WHERE token=? AND hidden=0{rsql}{wsql} "
+        "ORDER BY block_time, id",
+        (token, *rparams, *wparams),
     ).fetchall()
 
     open_buys: list[int] = []
@@ -132,10 +158,20 @@ def move_match(con: sqlite3.Connection, match_id: int, new_buy_id: int | None,
 
 # ---------------------------------------------------------------- statystyki
 
-def tx_view(con: sqlite3.Connection, token: str) -> dict:
-    """Pelny widok: transakcje + dopasowania + statystyki calosci."""
+def tx_view(con: sqlite3.Connection, token: str,
+            t_from: int | None = None, t_to: int | None = None,
+            include_hidden: bool = False,
+            wallet_ids: list[int] | None = None) -> dict:
+    """Pelny widok: transakcje + dopasowania + statystyki calosci.
+
+    Filtr dat i flaga hidden zawezaja WIDOK i statystyki, ale dopasowania
+    liczone sa na calej bazie — dzieki temu 'otwarte' ilosci sa prawdziwe
+    takze wtedy, gdy druga noga pary jest ukryta albo lezy poza zakresem.
+    include_hidden=True (tryb edycji) pokazuje tez ukryte wiersze; statystyki
+    zawsze licza tylko nieukryte.
+    """
     txs = [dict(r) for r in con.execute(
-        "SELECT * FROM tx WHERE token=? AND hidden=0 ORDER BY block_time DESC, id DESC",
+        "SELECT * FROM tx WHERE token=? ORDER BY block_time DESC, id DESC",
         (token,),
     )]
     by_id = {t["id"]: t for t in txs}
@@ -153,6 +189,8 @@ def tx_view(con: sqlite3.Connection, token: str) -> dict:
             continue
         m["buy_price"] = b["price"]
         m["sell_price"] = s["price"]
+        m["buy_time"] = b["block_time"]
+        m["sell_time"] = s["block_time"]
         m["pnl"] = m["qty"] * (s["price"] - b["price"])
         b["matched"] += m["qty"]
         s["matched"] += m["qty"]
@@ -161,10 +199,32 @@ def tx_view(con: sqlite3.Connection, token: str) -> dict:
 
     for t in txs:
         t["remaining"] = max(0.0, t["qty"] - t["matched"])
-        t["realized_pnl"] = sum(m["pnl"] for m in t["matches"]) if t["side"] == "buy" else None
+        # PnL par danej transakcji — dla kupna i sprzedazy (to te same pary
+        # widziane z dwoch stron; suma globalna liczona jest z listy matches)
+        t["realized_pnl"] = sum(m["pnl"] for m in t["matches"]) if t["matches"] else None
 
-    buys = [t for t in txs if t["side"] == "buy"]
-    sells = [t for t in txs if t["side"] == "sell"]
+    def in_range(ts: int) -> bool:
+        return (t_from is None or ts >= t_from) and (t_to is None or ts <= t_to)
+
+    hidden_ids = {t["id"] for t in txs if t["hidden"]}
+    if wallet_ids is not None:
+        wset = set(wallet_ids)
+        out_ids = {t["id"] for t in txs if t["wallet_id"] not in wset}
+    else:
+        out_ids = set()
+    txs = [t for t in txs if in_range(t["block_time"])
+           and t["id"] not in out_ids
+           and (include_hidden or not t["hidden"])]
+    # do statystyk licza sie tylko pary w calosci w zakresie, bez ukrytych
+    # i bez nog spoza zaznaczonych portfeli
+    excl = hidden_ids | out_ids
+    matches = [m for m in matches
+               if "pnl" in m and in_range(m["buy_time"]) and in_range(m["sell_time"])
+               and m["buy_id"] not in excl and m["sell_id"] not in excl]
+
+    stat_txs = [t for t in txs if not t["hidden"]]
+    buys = [t for t in stat_txs if t["side"] == "buy"]
+    sells = [t for t in stat_txs if t["side"] == "sell"]
     tot_buy_qty = sum(t["qty"] for t in buys)
     tot_sell_qty = sum(t["qty"] for t in sells)
     open_buy_qty = sum(t["remaining"] for t in buys)
@@ -191,9 +251,11 @@ def tx_view(con: sqlite3.Connection, token: str) -> dict:
     }
 
 
-def group_stats(con: sqlite3.Connection, token: str, current_price: float | None) -> list[dict]:
+def group_stats(con: sqlite3.Connection, token: str, current_price: float | None,
+                t_from: int | None = None, t_to: int | None = None,
+                wallet_ids: list[int] | None = None) -> list[dict]:
     groups = [dict(r) for r in con.execute("SELECT * FROM grp ORDER BY sort, id")]
-    view = tx_view(con, token)
+    view = tx_view(con, token, t_from, t_to, wallet_ids=wallet_ids)
     by_group: dict[int | None, list[dict]] = {}
     for t in view["txs"]:
         by_group.setdefault(t["group_id"], []).append(t)

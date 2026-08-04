@@ -3,15 +3,42 @@
 {% block content %}
 
 <section class="toolbar">
-  <div class="pricebox"><span class="label">Suma portfela</span>
+  <div class="pricebox"><span class="label">Suma portfeli</span>
     <span id="total" class="mono big">—</span> <span class="muted">XNT (orientacyjnie)</span>
   </div>
-  <div class="actions"><button id="btn-refresh" class="btn primary">↻ Odśwież</button></div>
+  <div class="actions">
+    <label class="switch"><input type="checkbox" id="show-hidden"><span>pokaż ukryte</span></label>
+    <button id="btn-refresh" class="btn primary">↻ Odśwież</button>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Portfele</h2>
+    <form id="form-wallet" class="inline">
+      <input id="w-address" placeholder="adres portfela (base58)" size="44">
+      <input id="w-name" placeholder="nazwa" size="10">
+      <input id="w-grp" placeholder="grupa (opcjonalnie)" size="14">
+      <button class="btn small">+ Dodaj portfel</button>
+    </form>
+  </div>
+  <div class="muted small-note" style="margin-bottom:8px">
+    ☑ zaznaczenie decyduje, które portfele widzi i paruje zakładka „Pary transakcji"
+    (i które synchronizuje ⛓). 👁 ukrycie chowa portfel z sald i wykresu.
+  </div>
+  <table class="tbl" id="tbl-wallets">
+    <thead><tr>
+      <th></th><th>Portfel</th><th class="r">XNT</th><th class="r">ANL</th>
+      <th class="r">XNM</th><th class="r">USDC.x</th>
+      <th class="r">Wartość [XNT]</th><th class="r">Udział</th><th></th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
 </section>
 
 <div class="cols">
   <section class="card">
-    <div class="card-head"><h2>Salda</h2></div>
+    <div class="card-head"><h2>Salda łączne (tokeny)</h2></div>
     <table class="tbl" id="tbl-bal">
       <thead><tr>
         <th>Token</th><th class="r">Ilość</th><th class="r">Cena [XNT]</th>
@@ -20,7 +47,7 @@
       <tbody></tbody>
     </table>
     <p class="muted small-note">Wycena orientacyjna — ceny syntetyczne z pul o niskiej płynności.
-    Tokeny bez skonfigurowanej puli nie wchodzą do proporcji.</p>
+    Tokeny bez skonfigurowanej puli nie wchodzą do proporcji. Ukryte portfele nie są liczone.</p>
   </section>
 
   <section class="card">

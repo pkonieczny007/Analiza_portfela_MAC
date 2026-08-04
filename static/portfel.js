@@ -1,21 +1,94 @@
-/* Portfel — salda i proporcje (pkt 2, wersja podstawowa) */
+/* Portfel — portfele (grupy, kolejnosc, zaznaczanie) + salda + proporcje */
 "use strict";
 
 const $ = (s) => document.querySelector(s);
 const COLORS = ["#4da3ff", "#3fb950", "#d29922", "#b57bff", "#f85149", "#39c5cf"];
+let SHOW_HIDDEN = false;
 
 function fmt(x, d = 4) {
   return x == null ? "—" : x.toLocaleString("pl-PL", { maximumFractionDigits: d });
 }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+function toast(msg, cls = "") {
+  const el = document.createElement("div");
+  el.className = "toast " + cls;
+  el.textContent = msg;
+  $("#toasts").appendChild(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+async function api(path, opts = {}) {
+  if (opts.body !== undefined) {
+    opts.headers = { "Content-Type": "application/json" };
+    opts.body = JSON.stringify(opts.body);
+  }
+  const r = await fetch(path, opts);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || r.status);
+  return data;
+}
 
 async function load() {
-  const r = await fetch("/api/balances");
-  const data = await r.json();
-
+  const data = await api("/api/balances" + (SHOW_HIDDEN ? "?hidden=1" : ""));
   $("#total").textContent = fmt(data.total_xnt, 2);
+  renderWallets(data);
+  renderTokens(data);
+  drawPie(data.items.filter(it => it.value_xnt > 0));
+}
 
-  const tbody = $("#tbl-bal tbody");
-  tbody.innerHTML = data.items.map(it => `
+function walletRow(w) {
+  const b = w.balances || {};
+  const dis = w.hidden ? " hidden-row" : "";
+  const bal = (sym) => w.balances ? fmt(b[sym], sym === "USDC.x" ? 3 : 1) : "—";
+  return `<tr class="txrow${dis}">
+    <td><input type="checkbox" ${w.selected ? "checked" : ""}
+        title="zaznacz do zakładki Pary" onchange="toggleSelected(${w.id}, this.checked)"></td>
+    <td>
+      <b>${esc(w.name)}</b>
+      ${w.hidden ? `<span class="badge-hidden">ukryty</span>` : ""}
+      <div class="muted mono" style="font-size:11px" title="${esc(w.address)}">
+        ${esc(w.address.slice(0, 6))}…${esc(w.address.slice(-6))}</div>
+    </td>
+    <td class="r mono">${bal("XNT")}</td>
+    <td class="r mono">${bal("ANL")}</td>
+    <td class="r mono">${bal("XNM")}</td>
+    <td class="r mono">${bal("USDC.x")}</td>
+    <td class="r mono">${w.balances ? fmt(w.value_xnt, 2) : "—"}</td>
+    <td class="r mono">${w.pct != null ? w.pct.toFixed(1) + " %" : "—"}</td>
+    <td class="w-actions">
+      <button class="iconbtn" title="w górę" onclick="moveWallet(${w.id},'up')">▲</button>
+      <button class="iconbtn" title="w dół" onclick="moveWallet(${w.id},'down')">▼</button>
+      <button class="iconbtn" title="zmień nazwę / grupę" onclick="editWallet(${w.id}, '${esc(w.name)}', '${esc(w.grp)}')">✎</button>
+      <button class="iconbtn" title="${w.hidden ? "pokaż" : "ukryj"}" onclick="toggleHidden(${w.id}, ${w.hidden ? 0 : 1})">${w.hidden ? "↩" : "👁"}</button>
+    </td>
+  </tr>`;
+}
+
+function renderWallets(data) {
+  const tbody = $("#tbl-wallets tbody");
+  const rows = [];
+  const wallets = data.wallets.filter(w => SHOW_HIDDEN || !w.hidden);
+  // grupowanie: kolejnosc grup wg pierwszego wystapienia (sort globalny)
+  const seen = new Map();
+  for (const w of wallets) {
+    const key = w.grp || "";
+    if (!seen.has(key)) seen.set(key, []);
+    seen.get(key).push(w);
+  }
+  for (const [grp, list] of seen) {
+    if (grp) {
+      const sum = list.reduce((a, w) => a + (w.value_xnt || 0), 0);
+      rows.push(`<tr class="grp-row"><td colspan="6">📁 ${esc(grp)}</td>
+        <td class="r mono">${fmt(sum, 2)}</td><td colspan="2"></td></tr>`);
+    }
+    for (const w of list) rows.push(walletRow(w));
+  }
+  tbody.innerHTML = rows.join("") || `<tr><td colspan="9" class="muted">brak portfeli — dodaj pierwszy</td></tr>`;
+}
+
+function renderTokens(data) {
+  $("#tbl-bal tbody").innerHTML = data.items.map(it => `
     <tr>
       <td><b>${it.symbol}</b></td>
       <td class="r mono">${fmt(it.amount, 4)}</td>
@@ -23,8 +96,6 @@ async function load() {
       <td class="r mono">${fmt(it.value_xnt, 3)}</td>
       <td class="r mono">${it.pct != null ? it.pct.toFixed(1) + " %" : "—"}</td>
     </tr>`).join("");
-
-  drawPie(data.items.filter(it => it.value_xnt > 0));
 }
 
 function drawPie(items) {
@@ -50,7 +121,6 @@ function drawPie(items) {
     ctx.strokeStyle = "#0d1117";
     ctx.lineWidth = 2;
     ctx.stroke();
-    // etykieta procentowa na wykresie
     if (frac > 0.04) {
       const mid = (angle + a2) / 2;
       ctx.fillStyle = "#fff";
@@ -66,5 +136,46 @@ function drawPie(items) {
     ${it.symbol}: ${fmt(it.value_xnt, 2)} XNT (${(it.value_xnt / total * 100).toFixed(1)}%)</span>`).join("");
 }
 
+// ---------------------------------------------------------------- akcje
+
+window.toggleSelected = async (id, on) => {
+  await api(`/api/wallets/${id}`, { method: "PATCH", body: { selected: on } });
+  toast(on ? "Portfel zaznaczony — widoczny w Parach" : "Portfel odznaczony", "ok");
+};
+window.toggleHidden = async (id, hide) => {
+  await api(`/api/wallets/${id}`, { method: "PATCH", body: { hidden: !!hide } });
+  await load();
+};
+window.moveWallet = async (id, dir) => {
+  await api(`/api/wallets/${id}/move`, { method: "POST", body: { dir } });
+  await load();
+};
+window.editWallet = async (id, name, grp) => {
+  const newName = prompt("Nazwa portfela:", name);
+  if (newName === null) return;
+  const newGrp = prompt("Grupa (puste = bez grupy):", grp || "");
+  if (newGrp === null) return;
+  await api(`/api/wallets/${id}`, { method: "PATCH", body: { name: newName, grp: newGrp } });
+  await load();
+};
+
+$("#form-wallet").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    await api("/api/wallets", {
+      method: "POST",
+      body: {
+        address: $("#w-address").value.trim(),
+        name: $("#w-name").value.trim(),
+        grp: $("#w-grp").value.trim(),
+      },
+    });
+    $("#w-address").value = ""; $("#w-name").value = ""; $("#w-grp").value = "";
+    toast("Portfel dodany", "ok");
+    await load();
+  } catch (err) { toast(err.message, "err"); }
+});
+
+$("#show-hidden").addEventListener("change", (e) => { SHOW_HIDDEN = e.target.checked; load(); });
 $("#btn-refresh").addEventListener("click", load);
-load();
+load().catch(e => toast("Błąd ładowania: " + e.message, "err"));

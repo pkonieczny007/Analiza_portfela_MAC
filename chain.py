@@ -134,7 +134,8 @@ def parse_swap(tx: dict, wallet: str) -> Optional[dict]:
     return None
 
 
-def sync_wallet(con, wallet: str, sleep_s: float = 0.12) -> dict:
+def sync_wallet(con, wallet: str, sleep_s: float = 0.12,
+                wallet_id: int | None = None) -> dict:
     """Pobiera nowe transakcje portfela i zapisuje swapy do DB."""
     import db as dbm
 
@@ -160,7 +161,7 @@ def sync_wallet(con, wallet: str, sleep_s: float = 0.12) -> dict:
             new_id = dbm.insert_tx(
                 con, signature=sig, block_time=swap["block_time"], side=swap["side"],
                 token=swap["token"], qty=swap["qty"], price=swap["price"],
-                quote_amount=swap["quote_amount"], source="chain",
+                quote_amount=swap["quote_amount"], source="chain", wallet_id=wallet_id,
             )
             if new_id:
                 added += 1

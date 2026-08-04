@@ -7,6 +7,16 @@
     <span class="label">{{ token }}/XNT</span>
     <span id="price" class="mono big">—</span>
     <span id="price-usd" class="muted mono"></span>
+    <span id="wallets-info" class="wallets-badge" title="zaznaczone portfele (zakładka Portfel)"></span>
+  </div>
+  <div class="filterbox inline">
+    <span class="label">Zakres:</span>
+    <input type="date" id="filter-from" title="od (włącznie)">
+    <span class="muted">—</span>
+    <input type="date" id="filter-to" title="do (włącznie)">
+    <button id="btn-filter-apply" class="btn small">Zastosuj</button>
+    <button id="btn-filter-today" class="btn small" title="pokazuj tylko od dziś">Od dziś</button>
+    <button id="btn-filter-clear" class="btn small">Wszystko</button>
   </div>
   <div class="actions">
     <label class="switch">
@@ -16,10 +26,19 @@
     <button id="btn-sync" class="btn primary">⛓ Synchronizuj z blockchain</button>
     <button id="btn-automatch" class="btn">⚡ Auto-dopasuj (FIFO)</button>
     <button id="btn-clear-matches" class="btn danger-ghost">✕ Wyczyść dopasowania</button>
+    <a class="btn" href="/api/export.xlsx" download>⬇ Eksport XLSX</a>
   </div>
 </section>
 
 <section class="kpis" id="kpis"></section>
+
+<section class="tabs" id="view-tabs">
+  <button class="tab active" data-tab="aktywne">Aktywne</button>
+  <button class="tab" data-tab="zakonczone">Zakończone</button>
+  <button class="tab" data-tab="razem">Aktywne+Zakończone</button>
+  <button class="tab" data-tab="ukryte">Ukryte</button>
+  <button id="btn-unhide-all" class="btn small" style="display:none">↩ Przywróć wszystkie ukryte</button>
+</section>
 
 <section class="card">
   <div class="card-head">
@@ -49,7 +68,7 @@
     <table class="tbl" id="tbl-sells">
       <thead><tr>
         <th>Data</th><th class="r">Ilość</th><th class="r">Cena</th><th class="r">Wartość</th>
-        <th>Dopasowano</th><th></th>
+        <th>Dopasowano</th><th class="r">PnL zreal.</th><th></th>
       </tr></thead>
       <tbody></tbody>
     </table>

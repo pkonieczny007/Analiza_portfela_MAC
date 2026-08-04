@@ -38,6 +38,15 @@ CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT
 );
+CREATE TABLE IF NOT EXISTS wallet (
+    id INTEGER PRIMARY KEY,
+    address TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    grp TEXT NOT NULL DEFAULT '',
+    sort INTEGER NOT NULL DEFAULT 0,
+    hidden INTEGER NOT NULL DEFAULT 0,
+    selected INTEGER NOT NULL DEFAULT 1
+);
 CREATE INDEX IF NOT EXISTS idx_tx_token_time ON tx(token, block_time);
 CREATE INDEX IF NOT EXISTS idx_match_buy ON match(buy_id);
 CREATE INDEX IF NOT EXISTS idx_match_sell ON match(sell_id);
@@ -54,6 +63,22 @@ def connect() -> sqlite3.Connection:
 def init() -> None:
     with connect() as con:
         con.executescript(SCHEMA)
+        # migracja: kolumna tx.wallet_id + portfel domyslny z config
+        cols = [r["name"] for r in con.execute("PRAGMA table_info(tx)")]
+        if "wallet_id" not in cols:
+            con.execute("ALTER TABLE tx ADD COLUMN wallet_id INTEGER REFERENCES wallet(id)")
+        if not con.execute("SELECT 1 FROM wallet LIMIT 1").fetchone():
+            con.execute(
+                "INSERT INTO wallet(address, name, grp, sort) VALUES (?,?,?,0)",
+                (config.WALLET, "MAC", ""),
+            )
+        default_id = con.execute("SELECT id FROM wallet ORDER BY sort, id").fetchone()["id"]
+        con.execute("UPDATE tx SET wallet_id=? WHERE wallet_id IS NULL", (default_id,))
+        con.commit()
+
+
+def selected_wallet_ids(con: sqlite3.Connection) -> list[int]:
+    return [r["id"] for r in con.execute("SELECT id FROM wallet WHERE selected=1")]
 
 
 def meta_get(con: sqlite3.Connection, key: str) -> str | None:
@@ -71,16 +96,17 @@ def meta_set(con: sqlite3.Connection, key: str, value: str) -> None:
 
 def insert_tx(con: sqlite3.Connection, *, signature: str | None, block_time: int,
               side: str, token: str, qty: float, price: float,
-              quote_amount: float, source: str = "chain", note: str | None = None) -> int | None:
+              quote_amount: float, source: str = "chain", note: str | None = None,
+              wallet_id: int | None = None) -> int | None:
     """Zwraca id nowego wiersza albo None, gdy sygnatura juz istnieje."""
     if signature:
         dup = con.execute("SELECT id FROM tx WHERE signature=?", (signature,)).fetchone()
         if dup:
             return None
     cur = con.execute(
-        "INSERT INTO tx(signature, block_time, side, token, qty, price, quote_amount, source, note) "
-        "VALUES (?,?,?,?,?,?,?,?,?)",
-        (signature, block_time, side, token, qty, price, quote_amount, source, note),
+        "INSERT INTO tx(signature, block_time, side, token, qty, price, quote_amount, "
+        "source, note, wallet_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (signature, block_time, side, token, qty, price, quote_amount, source, note, wallet_id),
     )
     return cur.lastrowid
 
