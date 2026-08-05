@@ -10,11 +10,14 @@ let SETTINGS = null;
 let SHOW_HIDDEN = false;
 
 /* Rozklad transz: size 1..100 (wagi ilosci), time 1..100 (dlugosci odstepow),
-   price -90..90 (offset % zakresu cenowego per transza). */
+   price -90..90 (offset % zakresu cenowego per transza).
+   LINK = grupy sprzezone: ruch suwaka w jednej przesuwa te same transze
+   w pozostalych polaczonych grupach (np. dluzszy odstep = wieksza kwota). */
 const W = { size: [], time: [], price: [] };
-const LOCK = { size: false, time: false, price: false };
+const LINK = { size: false, time: false, price: false };
 
 const GROUPS = ["size", "time", "price"];
+const GROUP_LABEL = { size: "wielkość", time: "czas", price: "cena" };
 const SKEW_SIGN = { size: 1, time: -1, price: 1 };  // time: prawo = gesciej na koncu
 
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -146,6 +149,43 @@ function evenGroup(group) {
   resetSkew(group);
 }
 
+/* ---------- laczenie suwakow (sprzezenie grup) ----------
+   Wspolna skala t: -1 = suwak do konca w lewo, 0 = srodek, +1 = w prawo.
+   size/time: 1..100 (srodek 50), price: pelne wychylenie = +-30%. */
+function toT(g, v) { return g === "price" ? v / 30 : (v - 50) / 50; }
+function fromT(g, t) {
+  return g === "price" ? clamp(Math.round(t * 30), -90, 90)
+    : clamp(Math.round(50 + t * 50), 1, 100);
+}
+
+function linkedGroups() { return GROUPS.filter(g => LINK[g]); }
+
+/** Przenosi pozycje suwaka transzy `i` z grupy `from` na pozostale polaczone. */
+function propagate(from, i) {
+  if (!LINK[from]) return;
+  const t = toT(from, W[from][i]);
+  linkedGroups().forEach(g => { if (g !== from) W[g][i] = fromT(g, t); });
+}
+
+/** To samo dla calej grupy (Mix / Rowno / skos / wlaczenie polaczenia). */
+function propagateAll(from) {
+  if (!LINK[from]) return;
+  W[from].forEach((_, i) => propagate(from, i));
+  linkedGroups().forEach(g => { if (g !== from) resetSkew(g); });
+}
+
+function renderLinkInfo() {
+  const on = linkedGroups();
+  const box = $("#mb-link-info");
+  if (!on.length) { box.textContent = ""; box.style.display = "none"; return; }
+  box.style.display = "";
+  box.innerHTML = on.length > 1
+    ? `🔗 Suwaki połączone: <b>${on.map(g => GROUP_LABEL[g]).join(" + ")}</b>
+       — ruch jednego przesuwa pozostałe.`
+    : `<span class="muted">🔗 Grupa <b>${GROUP_LABEL[on[0]]}</b> czeka na parę —
+       włącz „Łącz" jeszcze w jednej grupie, aby suwaki chodziły razem.</span>`;
+}
+
 function renderRows() {
   const n = W.size.length;
   let html = "";
@@ -164,7 +204,7 @@ function renderRows() {
     </div>`;
   }
   $("#mb-rows").innerHTML = html;
-  applyLocks();
+  applyLinks();
   refresh();
 }
 
@@ -175,21 +215,19 @@ function syncSliders() {
   });
 }
 
-function applyLocks() {
+function applyLinks() {
   GROUPS.forEach(g => {
-    const on = LOCK[g];
-    document.querySelectorAll(`#mb-rows input[data-g="${g}"]`).forEach(el => { el.disabled = on; });
-    const skew = $(`#mb-dist .skew[data-skew="${g}"]`);
-    if (skew) skew.disabled = on;
-    const btn = $(`#mb-dist .lockbtn[data-lock="${g}"]`);
+    const on = LINK[g];
+    const btn = $(`#mb-dist .linkbtn[data-link="${g}"]`);
     if (btn) {
-      btn.textContent = on ? "🔒" : "🔓";
       btn.classList.toggle("on", on);
-      btn.title = on ? "Suwaki zablokowane — kliknij, aby odblokować" : "Zablokuj suwaki";
+      btn.title = on ? "Odłącz suwaki tej grupy" : "Połącz suwaki z inną grupą";
     }
     const box = $(`#mb-dist .dist-group[data-group="${g}"]`);
-    if (box) box.classList.toggle("locked", on);
+    if (box) box.classList.toggle("linked", on);
+    document.querySelectorAll(`#mb-rows .wcell.${g}`).forEach(el => el.classList.toggle("linked", on));
   });
+  renderLinkInfo();
 }
 
 // ---------------------------------------------------------------- plan
@@ -291,10 +329,11 @@ $("#mb-slices").addEventListener("input", () => { initDist(curN()); renderRows()
 $("#mb-rows").addEventListener("input", (e) => {
   const el = e.target.closest("input[type=range]");
   if (!el) return;
-  const g = el.dataset.g;
-  if (LOCK[g]) { el.value = W[g][+el.dataset.i]; return; }
-  W[g][+el.dataset.i] = +el.value;
+  const g = el.dataset.g, i = +el.dataset.i;
+  W[g][i] = +el.value;
   resetSkew(g);
+  propagate(g, i);          // sprzezone grupy jada za tym suwakiem
+  syncSliders();
   refresh();
 });
 
@@ -302,23 +341,29 @@ $("#mb-dist").addEventListener("input", (e) => {
   const el = e.target.closest(".skew");
   if (!el) return;
   const g = el.dataset.skew;
-  if (LOCK[g]) { el.value = 0; return; }
   applySkew(g, +el.value);
+  propagateAll(g);
   syncSliders();
   refresh();
 });
 
 $("#mb-dist").addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-mix],button[data-even],button[data-lock]");
+  const btn = e.target.closest("button[data-mix],button[data-even],button[data-link]");
   if (!btn) return;
-  if (btn.dataset.lock) {
-    LOCK[btn.dataset.lock] = !LOCK[btn.dataset.lock];
-    applyLocks();
+  if (btn.dataset.link) {
+    const g = btn.dataset.link;
+    LINK[g] = !LINK[g];
+    if (LINK[g]) {
+      // dolaczana grupa przejmuje uklad suwakow od juz polaczonej
+      const master = linkedGroups().find(x => x !== g);
+      if (master) { propagateAll(master); syncSliders(); refresh(); }
+    }
+    applyLinks();
     return;
   }
   const g = btn.dataset.mix || btn.dataset.even;
-  if (LOCK[g]) return toast("Suwaki zablokowane — odblokuj 🔒", "err");
   btn.dataset.mix ? mixGroup(g) : evenGroup(g);
+  propagateAll(g);
   syncSliders();
   refresh();
 });

@@ -77,6 +77,7 @@
     <h2>⚖ Rozkład transz</h2>
     <span class="muted small-note" style="margin:0">
       Suwaki dzielą ilość, odstępy czasu i przesunięcie ceny pomiędzy transze.
+      <b>🔗 Łącz</b> w dwóch grupach sprzęga suwaki — ruch jednego przesuwa drugi.
     </span>
   </div>
 
@@ -87,7 +88,8 @@
         <span class="spacer"></span>
         <button type="button" class="btn small" data-even="size">Równo</button>
         <button type="button" class="btn small" data-mix="size">🎲 Mix</button>
-        <button type="button" class="btn small lockbtn" data-lock="size" title="Zablokuj suwaki">🔓</button>
+        <button type="button" class="btn small linkbtn" data-link="size"
+                title="Połącz suwaki z inną grupą">🔗 Łącz</button>
       </div>
       <div class="skew-lbl"><span>większe na początku</span><span>równo</span><span>większe na końcu</span></div>
       <input type="range" class="skew" data-skew="size" min="-100" max="100" value="0">
@@ -99,7 +101,8 @@
         <span class="spacer"></span>
         <button type="button" class="btn small" data-even="time">Równo</button>
         <button type="button" class="btn small" data-mix="time">🎲 Mix</button>
-        <button type="button" class="btn small lockbtn" data-lock="time" title="Zablokuj suwaki">🔓</button>
+        <button type="button" class="btn small linkbtn" data-link="time"
+                title="Połącz suwaki z inną grupą">🔗 Łącz</button>
       </div>
       <div class="skew-lbl"><span>gęściej na początku</span><span>równo</span><span>gęściej na końcu</span></div>
       <input type="range" class="skew" data-skew="time" min="-100" max="100" value="0">
@@ -111,13 +114,15 @@
         <span class="spacer"></span>
         <button type="button" class="btn small" data-even="price">Równo</button>
         <button type="button" class="btn small" data-mix="price">🎲 Mix</button>
-        <button type="button" class="btn small lockbtn" data-lock="price" title="Zablokuj suwaki">🔓</button>
+        <button type="button" class="btn small linkbtn" data-link="price"
+                title="Połącz suwaki z inną grupą">🔗 Łącz</button>
       </div>
       <div class="skew-lbl"><span>niżej na początku</span><span>bez przesunięcia</span><span>wyżej na końcu</span></div>
       <input type="range" class="skew" data-skew="price" min="-100" max="100" value="0">
     </div>
   </div>
 
+  <div id="mb-link-info" class="link-info"></div>
   <div id="mb-rows"></div>
 </section>
 

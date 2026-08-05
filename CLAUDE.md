@@ -85,7 +85,7 @@ offset % per transza, `skipped` gdy okno minelo. Scheduler startuje w
 ### Rozklad transz — mix wielkosci, czasu i ceny
 
 Karta „⚖ Rozklad transz" (`templates/multibot.html` + `static/multibot.js`):
-trzy grupy suwakow, kazda z przyciskami **Rowno / 🎲 Mix / 🔒 blokada**
+trzy grupy suwakow, kazda z przyciskami **Rowno / 🎲 Mix / 🔗 Lacz**
 i suwakiem skosu (rampa od pierwszej do ostatniej transzy):
 - **wielkosc pozycji** — wagi 1..100 -> `weights` (kwota dzielona proporcjonalnie),
 - **czas (odstepy)** — wagi 1..100 -> `time_weights`; to DLUGOSCI ODSTEPOW
@@ -97,9 +97,15 @@ i suwakiem skosu (rampa od pierwszej do ostatniej transzy):
   przyciskow ±1/±5 z BOT_AGG1).
 
 Wyzwalacz steruje widocznoscia grup: `time` — tylko suwaki czasu (ceny stale),
-`price` — tylko suwaki ceny (czas staly), `time_price` — oba. Blokada 🔒
-wylacza suwaki grupy (takze Mix/Rowno) — do „zamrozenia" recznie ustawionego
-rozkladu przed wyslaniem. Zmiana liczby transz resetuje rozklad do rownego.
+`price` — tylko suwaki ceny (czas staly), `time_price` — oba.
+
+**🔗 Lacz = sprzezenie grup** (nie blokada): wlaczone w >=2 grupach powoduje,
+ze ruch suwaka transzy `i` przesuwa te sama transze w pozostalych polaczonych
+grupach — dluzszy odstep = wieksza kwota. Przeliczanie przez wspolna skale
+`t ∈ <-1,1>` (`toT`/`fromT`): size/time 1..100 (srodek 50) <-> price +-30%,
+wiec srodek suwaka = 0 %. Mix, Rowno i skos w polaczonej grupie tez przenosza
+uklad na pozostale; wlaczenie „Lacz" przejmuje uklad od juz polaczonej grupy.
+Zmiana liczby transz resetuje rozklad do rownego.
 
 ## Portfele (multi-wallet)
 

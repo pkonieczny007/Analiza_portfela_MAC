@@ -179,10 +179,12 @@ input[type="range"]:disabled { accent-color: var(--border); cursor: not-allowed;
   gap: 14px; margin-bottom: 14px; }
 .dist-group { background: var(--panel2); border: 1px solid var(--border);
   border-radius: 10px; padding: 10px 12px; }
-.dist-group.locked { border-color: var(--amber); }
+.dist-group.linked { border-color: var(--accent); }
 .dist-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 13px; }
 .dist-head .spacer { margin-left: auto; }
-.lockbtn.on { color: var(--amber); border-color: var(--amber); }
+.linkbtn.on { color: var(--accent); border-color: var(--accent); }
+.link-info { font-size: 12px; color: var(--text); margin: 2px 0 8px; }
+.wcell.linked input[type="range"] { accent-color: #7ec2ff; }
 .skew-lbl { display: flex; justify-content: space-between; font-size: 11px;
   color: var(--muted); margin-bottom: 2px; }
 .wrow { display: flex; align-items: center; gap: 12px; padding: 3px 0; }
