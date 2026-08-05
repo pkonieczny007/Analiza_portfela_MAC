@@ -66,8 +66,13 @@ wyprowadzane z konta puli (`POOL_OFFSETS`, strona XNT rozpoznawana po mincie
 w koncie vaultu, token_program = wlasciciel konta mintu). Sprawdzone: XNM
 wyprowadza sie poprawnie.
 
-Klucze: pliki JSON solana-cli w `wallet/` (`wallet/*` w .gitignore poza
-README). Do UI trafia tylko nazwa pliku + pubkey — nigdy sekret.
+Klucze: pliki w `wallet/` (`wallet/*` w .gitignore poza README), rozszerzenia
+`.json`/`.txt`/`.key`. `load_keypair` rozpoznaje format po ZAWARTOSCI, nie po
+rozszerzeniu — tablica intow solana-cli (64 lub 32=seed) albo base58 w jednej
+linii, bo portfele przegladarkowe (Phantom/Solflare) eksportuja base58 nawet
+do pliku `.json`. Base58 dekodowany wlasnym `_b58decode` (stdlib, sprawdzony
+z `Keypair.from_base58_string`). Do UI trafia tylko nazwa pliku + pubkey —
+nigdy sekret.
 
 Bezpieczniki: DRY-RUN domyslnie (przelacznik w UI -> `meta.trade_dry_run`,
 wlaczenie LIVE wymaga potwierdzenia), min_out z poslizgiem (`meta.trade_slippage_bps`,

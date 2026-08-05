@@ -76,13 +76,18 @@ class KeyEntry:
     pubkey: str
 
 
+KEY_SUFFIXES = (".json", ".txt", ".key")
+
+_B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
 def list_keys() -> list[KeyEntry]:
     """Wszystkie klucze z katalogu wallet/ (bez wczytywania sekretow do UI)."""
     out: list[KeyEntry] = []
     if not config.WALLET_DIR.exists():
         return out
     for p in sorted(config.WALLET_DIR.iterdir()):
-        if not p.is_file() or p.suffix != ".json":
+        if not p.is_file() or p.suffix.lower() not in KEY_SUFFIXES:
             continue
         try:
             kp = load_keypair(p)
@@ -93,21 +98,62 @@ def list_keys() -> list[KeyEntry]:
     return out
 
 
+def _b58decode(s: str) -> bytes:
+    """Base58 (alfabet bitcoinowy) — bez zaleznosci, kilkanascie bajtow roboty."""
+    num = 0
+    for ch in s:
+        idx = _B58_ALPHABET.find(ch)
+        if idx < 0:
+            raise ValueError(f"znak {ch!r} nie nalezy do base58")
+        num = num * 58 + idx
+    body = num.to_bytes((num.bit_length() + 7) // 8, "big")
+    return b"\x00" * (len(s) - len(s.lstrip("1"))) + body
+
+
+def _keypair_from_bytes(S, raw: bytes, where: str):
+    if len(raw) == 64:
+        return S["Keypair"].from_bytes(raw)
+    if len(raw) == 32:
+        # sam seed (bez doklejonego pubkey) — reszte solders dolicza
+        return S["Keypair"].from_seed(raw)
+    raise ValueError(f"klucz ma {len(raw)} bajtow, oczekiwano 64 lub 32 ({where})")
+
+
 def load_keypair(path: str | Path):
-    """Wczytaj keypair z pliku solana-cli (JSON: tablica 64 intow)."""
+    """Wczytaj keypair z pliku. Format rozpoznajemy po ZAWARTOSCI, nie po
+    rozszerzeniu — portfele przegladarkowe zapisuja base58 do pliku .json:
+
+    - solana-cli / bot: JSON = tablica 64 intow (albo 32 = sam seed),
+    - Phantom / Solflare / Backpack: base58 w jednej linii, czasem
+      w cudzyslowach.
+    """
     S = _solders()
     p = Path(path)
     if not p.is_absolute():
         p = config.WALLET_DIR / p
     if not p.is_file():
         raise FileNotFoundError(f"Nie ma pliku klucza: {p}")
-    data = json.loads(p.read_text(encoding="utf-8"))
-    if not isinstance(data, list):
-        raise ValueError(f"Oczekiwano tablicy JSON w {p.name}")
-    raw = bytes(data)
-    if len(raw) != 64:
-        raise ValueError(f"Oczekiwano 64 bajtow klucza, jest {len(raw)} ({p.name})")
-    return S["Keypair"].from_bytes(raw)
+    txt = p.read_text(encoding="utf-8").strip()
+    if not txt:
+        raise ValueError(f"Pusty plik klucza: {p.name}")
+
+    if txt.startswith("["):
+        data = json.loads(txt)
+        if not isinstance(data, list):
+            raise ValueError(f"Oczekiwano tablicy JSON w {p.name}")
+        if not all(isinstance(x, int) and 0 <= x <= 255 for x in data):
+            raise ValueError(f"Tablica w {p.name} musi zawierac bajty 0..255")
+        return _keypair_from_bytes(S, bytes(data), p.name)
+
+    b58 = txt.strip('"').strip("'").strip()
+    if any(c.isspace() for c in b58):
+        raise ValueError(f"Nierozpoznany format klucza w {p.name} "
+                         f"(ani tablica JSON, ani base58 w jednej linii)")
+    try:
+        raw = _b58decode(b58)
+    except ValueError as e:
+        raise ValueError(f"Nierozpoznany format klucza w {p.name}: {e}") from e
+    return _keypair_from_bytes(S, raw, p.name)
 
 
 def find_key(name_or_file: str):

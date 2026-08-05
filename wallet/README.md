@@ -1,13 +1,25 @@
 # wallet/ — klucze prywatne
 
-Tu wrzucasz pliki JSON z kluczami prywatnymi w formacie **solana-cli**:
-tablica 64 liczb, np.
+Tu wrzucasz pliki z kluczami prywatnymi. Format rozpoznawany jest po
+**zawartości**, nie po rozszerzeniu — obsługiwane są dwa:
+
+**1. solana-cli / bot** — tablica 64 liczb (albo 32 = sam seed):
 
 ```json
 [12,34,56, ... ,78]
 ```
 
-Każdy plik `.json` w tym katalogu pojawia się jako pozycja na liście
+**2. portfel przeglądarkowy** (Phantom, Solflare, Backpack) — klucz base58
+w jednej linii, opcjonalnie w cudzysłowach:
+
+```
+5Jd…(ok. 88 znaków)…xQ
+```
+
+Portfele przeglądarkowe eksportują base58 nawet do pliku `.json`, choć to nie
+jest JSON — dlatego liczy się zawartość. Czytane są `.json`, `.txt` i `.key`.
+
+Każdy plik z kluczem w tym katalogu pojawia się jako pozycja na liście
 „Klucz podpisujący" (nazwa = nazwa pliku bez rozszerzenia, obok skrócony
 adres publiczny wyliczony z klucza).
 
