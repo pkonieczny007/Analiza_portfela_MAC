@@ -172,6 +172,30 @@ select.mini, .tbl select { background: var(--panel2); color: var(--text);
 .o-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); }
 .o-stats b { color: var(--text); font-weight: 500; }
 
+/* MultiBOT — rozklad transz (suwaki wielkosci / czasu / ceny) */
+input[type="range"] { accent-color: var(--accent); width: 100%; cursor: pointer; }
+input[type="range"]:disabled { accent-color: var(--border); cursor: not-allowed; opacity: .55; }
+.dist-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px; margin-bottom: 14px; }
+.dist-group { background: var(--panel2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; }
+.dist-group.locked { border-color: var(--amber); }
+.dist-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 13px; }
+.dist-head .spacer { margin-left: auto; }
+.lockbtn.on { color: var(--amber); border-color: var(--amber); }
+.skew-lbl { display: flex; justify-content: space-between; font-size: 11px;
+  color: var(--muted); margin-bottom: 2px; }
+.wrow { display: flex; align-items: center; gap: 12px; padding: 3px 0; }
+.wlbl { width: 78px; flex: none; font-size: 12px; color: var(--muted); }
+.wcell { flex: 1 1 0; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wcell .wval { flex: none; width: 150px; text-align: right; font-size: 12px;
+  font-family: Consolas, "Cascadia Mono", monospace; }
+.wcell.price .wval { width: 56px; }
+.wval .wpct { color: var(--muted); }
+.wval.zero { color: var(--muted); } .wval.plus { color: var(--green); } .wval.minus { color: var(--red); }
+#mb-rows.no-time .wcell.time, #mb-rows.no-price .wcell.price { display: none; }
+@media (max-width: 900px) { .wrow { flex-wrap: wrap; } .wcell { flex-basis: 100%; } }
+
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex;
   flex-direction: column; gap: 8px; z-index: 100; }
 .toast { background: var(--panel2); border: 1px solid var(--border); border-left: 3px solid var(--accent);

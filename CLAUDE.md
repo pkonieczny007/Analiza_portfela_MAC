@@ -82,6 +82,25 @@ rowno, ostatnia bierze reszte), okno czasowe, wyzwalacze time/price/time_price,
 offset % per transza, `skipped` gdy okno minelo. Scheduler startuje w
 `app.py:__main__` (nie przy imporcie — inaczej odpalilby sie w kazdym workerze).
 
+### Rozklad transz — mix wielkosci, czasu i ceny
+
+Karta „⚖ Rozklad transz" (`templates/multibot.html` + `static/multibot.js`):
+trzy grupy suwakow, kazda z przyciskami **Rowno / 🎲 Mix / 🔒 blokada**
+i suwakiem skosu (rampa od pierwszej do ostatniej transzy):
+- **wielkosc pozycji** — wagi 1..100 -> `weights` (kwota dzielona proporcjonalnie),
+- **czas (odstepy)** — wagi 1..100 -> `time_weights`; to DLUGOSCI ODSTEPOW
+  miedzy transzami, normalizowane do okna (`multibot._slice_times`), wiec
+  mix czasu zmienia rytm, ale nigdy sumy: 30 min / 3 transze potrafi dac
+  10/8/12 min zamiast 3x10. Brak wag albo wagi rowne = stare zachowanie
+  (`window_start + okno * i / n`),
+- **przesuniecie ceny %** — suwaki -90..90 -> `offsets` (zamiast dawnych
+  przyciskow ±1/±5 z BOT_AGG1).
+
+Wyzwalacz steruje widocznoscia grup: `time` — tylko suwaki czasu (ceny stale),
+`price` — tylko suwaki ceny (czas staly), `time_price` — oba. Blokada 🔒
+wylacza suwaki grupy (takze Mix/Rowno) — do „zamrozenia" recznie ustawionego
+rozkladu przed wyslaniem. Zmiana liczby transz resetuje rozklad do rownego.
+
 ## Portfele (multi-wallet)
 
 Tabela `wallet` (address UNIQUE, name, grp, sort, hidden, selected) +

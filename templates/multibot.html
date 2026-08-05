@@ -72,6 +72,55 @@
   </section>
 </div>
 
+<section class="card" id="mb-dist">
+  <div class="card-head">
+    <h2>⚖ Rozkład transz</h2>
+    <span class="muted small-note" style="margin:0">
+      Suwaki dzielą ilość, odstępy czasu i przesunięcie ceny pomiędzy transze.
+    </span>
+  </div>
+
+  <div class="dist-groups">
+    <div class="dist-group" data-group="size">
+      <div class="dist-head">
+        <b>Wielkość pozycji</b>
+        <span class="spacer"></span>
+        <button type="button" class="btn small" data-even="size">Równo</button>
+        <button type="button" class="btn small" data-mix="size">🎲 Mix</button>
+        <button type="button" class="btn small lockbtn" data-lock="size" title="Zablokuj suwaki">🔓</button>
+      </div>
+      <div class="skew-lbl"><span>większe na początku</span><span>równo</span><span>większe na końcu</span></div>
+      <input type="range" class="skew" data-skew="size" min="-100" max="100" value="0">
+    </div>
+
+    <div class="dist-group" data-group="time">
+      <div class="dist-head">
+        <b>Czas — odstępy transz</b>
+        <span class="spacer"></span>
+        <button type="button" class="btn small" data-even="time">Równo</button>
+        <button type="button" class="btn small" data-mix="time">🎲 Mix</button>
+        <button type="button" class="btn small lockbtn" data-lock="time" title="Zablokuj suwaki">🔓</button>
+      </div>
+      <div class="skew-lbl"><span>gęściej na początku</span><span>równo</span><span>gęściej na końcu</span></div>
+      <input type="range" class="skew" data-skew="time" min="-100" max="100" value="0">
+    </div>
+
+    <div class="dist-group" data-group="price">
+      <div class="dist-head">
+        <b>Przesunięcie ceny (%)</b>
+        <span class="spacer"></span>
+        <button type="button" class="btn small" data-even="price">Równo</button>
+        <button type="button" class="btn small" data-mix="price">🎲 Mix</button>
+        <button type="button" class="btn small lockbtn" data-lock="price" title="Zablokuj suwaki">🔓</button>
+      </div>
+      <div class="skew-lbl"><span>niżej na początku</span><span>bez przesunięcia</span><span>wyżej na końcu</span></div>
+      <input type="range" class="skew" data-skew="price" min="-100" max="100" value="0">
+    </div>
+  </div>
+
+  <div id="mb-rows"></div>
+</section>
+
 <section class="card">
   <div class="card-head"><h2>☰ Zlecenia</h2></div>
   <div id="mb-orders" class="muted">brak zleceń</div>

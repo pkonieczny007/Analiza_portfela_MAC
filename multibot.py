@@ -6,7 +6,8 @@ Port idei z BOT_AGG1/app/trading/multibot.py na SQLite + watek w tle
 Model:
 - side buy|sell na parze TOKEN/XNT,
 - total_amount w jednostce: XNT dla buy, token dla sell,
-- num_slices transz rozlozonych rownomiernie w oknie [start, end],
+- num_slices transz rozlozonych w oknie [start, end] — rowno albo wg wag
+  czasowych (`time_weights` = dlugosci odstepow, "mix czasu"),
 - opcjonalny zakres cenowy + offset % per transza,
 - trigger_mode: time | price | time_price.
 
@@ -48,11 +49,44 @@ def _split_amounts(total: float, n: int, weights: list[float] | None) -> list[fl
     return [base] * (n - 1) + [total - base * (n - 1)]
 
 
+def _clean_weights(weights: list[float] | None, n: int) -> list[float] | None:
+    """Wagi -> lista n dodatnich floatow albo None (gdy brak/bezuzyteczne)."""
+    if not weights or len(weights) != n:
+        return None
+    out = []
+    for w in weights:
+        try:
+            out.append(max(0.0, float(w)))
+        except (TypeError, ValueError):
+            return None
+    return out if sum(out) > 0 else None
+
+
+def _slice_times(window_start: int, window_end: int, n: int,
+                 time_weights: list[float] | None) -> list[int]:
+    """Momenty startu transz w oknie.
+
+    `time_weights` to dlugosci ODSTEPOW miedzy transzami (mix czasu) —
+    normalizowane do dlugosci okna, wiec suma odstepow zawsze = okno.
+    Brak wag albo wagi rowne = rowne odstepy (zachowanie sprzed mixu):
+    transza i startuje w window_start + okno * i / n.
+    """
+    ws = _clean_weights(time_weights, n) or [1.0] * n
+    win = window_end - window_start
+    total = sum(ws)
+    out, acc = [], 0.0
+    for i in range(n):
+        out.append(int(window_start + win * acc / total))
+        acc += ws[i]
+    return out
+
+
 def create_order(*, side: str, token: str, key_file: str, total_amount: float,
                  num_slices: int, window_start: int, window_end: int,
                  price_min: float | None = None, price_max: float | None = None,
                  trigger_mode: str = "time_price", weights: list[float] | None = None,
-                 offsets: list[float] | None = None, slippage_bps: int = 300,
+                 offsets: list[float] | None = None,
+                 time_weights: list[float] | None = None, slippage_bps: int = 300,
                  dry_run: bool = True, note: str | None = None) -> int:
     side = (side or "").lower()
     if side not in ("buy", "sell"):
@@ -73,7 +107,7 @@ def create_order(*, side: str, token: str, key_file: str, total_amount: float,
 
     amount_unit = "xnt" if side == "buy" else "token"
     amounts = _split_amounts(float(total_amount), num_slices, weights)
-    step = (window_end - window_start) / num_slices
+    times = _slice_times(window_start, window_end, num_slices, time_weights)
 
     with dbm.connect() as con:
         cur = con.execute(
@@ -96,7 +130,7 @@ def create_order(*, side: str, token: str, key_file: str, total_amount: float,
             con.execute(
                 "INSERT INTO multi_slice(order_id, idx, amount, scheduled_at, "
                 "price_offset_pct) VALUES (?,?,?,?,?)",
-                (oid, i, round(amounts[i], 12), int(window_start + step * i), off),
+                (oid, i, round(amounts[i], 12), times[i], off),
             )
         con.commit()
     log.info("MultiBOT #%s: %s %s %s w %s transzach, okno %s..%s, dry_run=%s",

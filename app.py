@@ -477,6 +477,7 @@ def api_multibot_create():
             price_max=_optional_float(body.get("price_max")),
             trigger_mode=body.get("trigger_mode", "time_price"),
             weights=body.get("weights"), offsets=body.get("offsets"),
+            time_weights=body.get("time_weights"),
             slippage_bps=settings["slippage_bps"], dry_run=settings["dry_run"],
             note=body.get("note"),
         )
