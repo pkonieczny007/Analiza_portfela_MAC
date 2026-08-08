@@ -129,6 +129,16 @@ select.mini, .tbl select { background: var(--panel2); color: var(--text);
 .small-note { font-size: 12px; margin: 10px 2px 0; }
 .grp-row td { background: #131a26; color: var(--muted); font-weight: 600;
   font-size: 12px; padding: 5px 8px; }
+.grp-row td.mono { color: var(--text); }
+/* powtarzany pasek symboli nad kazda suma — orientacja w dlugiej tabeli */
+.symrow td { background: #10161f; color: var(--muted); font-size: 10px;
+  text-transform: uppercase; letter-spacing: .4px; padding: 3px 8px; border-bottom: none; }
+/* suma calkowita tabeli portfeli — mocniejsza od sum grup */
+.total-row td { background: var(--panel2); color: var(--text); font-weight: 700;
+  border-top: 2px solid var(--border); padding: 7px 8px; }
+/* przeliczenie sumy tokenow na XNT (pod SUMA) */
+.xntrow td { background: #131a26; color: var(--muted); font-size: 12px; padding: 5px 8px; }
+.xntrow td.mono { color: var(--text); }
 .w-actions { white-space: nowrap; text-align: right; }
 .w-actions .iconbtn:hover { color: var(--accent); }
 .wallets-badge { color: var(--muted); font-size: 12px; }

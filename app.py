@@ -146,9 +146,13 @@ def api_sync():
         ).fetchall()
         if not rows:
             return jsonify({"error": "Brak zaznaczonych portfeli (zakladka Portfel)"}), 400
+        # filtr "od" ucina tez sync — nie schodzimy w historie sprzed tej daty
+        since_ts, _ = _get_filter(con)
+        totals["since"] = since_ts
         for w in rows:
             try:
-                r = chain.sync_wallet(con, w["address"], wallet_id=w["id"])
+                r = chain.sync_wallet(con, w["address"], wallet_id=w["id"],
+                                      since_ts=since_ts)
             except Exception as e:  # noqa: BLE001
                 log.exception("sync %s failed", w["name"])
                 totals["errors"] += 1
@@ -709,7 +713,7 @@ def _prices_xnt() -> dict[str, float | None]:
 
 @app.get("/api/balances")
 def api_balances():
-    """Salda per portfel (nieukryte) + agregat tokenow do wykresu."""
+    """Salda per portfel + agregat tokenow do wykresu (ukryte tylko z ?hidden=1)."""
     show_hidden = request.args.get("hidden") == "1"
     with dbm.connect() as con:
         wallets = [dict(r) for r in con.execute("SELECT * FROM wallet ORDER BY sort, id")]
@@ -726,9 +730,10 @@ def api_balances():
         w["value_xnt"] = sum(
             amt * prices[sym] for sym, amt in bal.items() if prices.get(sym) is not None
         )
-        if not w["hidden"]:
-            for sym, amt in bal.items():
-                token_totals[sym] = token_totals.get(sym, 0.0) + amt
+        # agregat liczony po tym, co widac: przy ?hidden=1 ukryte tez wchodza,
+        # inaczej naglowek i suma tabeli portfeli pokazywalyby rozne liczby
+        for sym, amt in bal.items():
+            token_totals[sym] = token_totals.get(sym, 0.0) + amt
 
     total_all = 0.0
     items = []

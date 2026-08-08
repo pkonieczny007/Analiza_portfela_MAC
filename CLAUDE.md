@@ -128,8 +128,25 @@ Semantyka flag:
   manualna tx dostaje pierwszy zaznaczony portfel. Zero zaznaczonych
   = pusty widok par (`_wallet_sql` -> `AND 0`).
 - **hidden** — portfel znika z sald/wykresu w zakladce Portfel
-  (RPC nie jest odpytywane, chyba ze `?hidden=1`); nie wplywa na Pary.
+  (RPC nie jest odpytywane, chyba ze `?hidden=1` — wtedy wchodzi tez do
+  agregatu `items`/`total_xnt`, zeby naglowek i SUMA tabeli nie pokazywaly
+  roznych liczb); nie wplywa na Pary.
 - **grp** — wolny tekst; UI grupuje wiersze naglowkami z suma grupy.
+
+Sumy w tabeli portfeli (`static/portfel.js`, wzor: `SKRYPT_PORTFELE-wersja2`):
+naglowek kazdej grupy to zarazem jej suma (per token XNT/ANL/XNM/USDC.x +
+wartosc XNT z ≈USD i udzial %), a na koncu wiersz **SUMA** po wszystkich
+wyswietlanych portfelach (`.total-row`). Baza udzialow = suma wyswietlanych
+portfeli, wiec SUMA zawsze daje 100 %; przy wlaczonym „pokaz ukryte" wiersz
+jest oznaczony „(z ukrytymi)". Token, ktorego nikt nie ma, to `—`, nie 0.
+
+Nad kazda suma (grupy i calkowita) leci `symbolRow()` — powtarzany pasek
+naglowkow kolumn (`.symrow`), zeby w dlugiej tabeli bylo widac, ktora kolumna
+to ktory token. Pod SUMA `xntRow()` (`.xntrow`, „≈ w XNT") przelicza kazda
+sume tokena na XNT po cenach z `items[].price_xnt` (tooltip = kurs
+jednostkowy) i podaje laczna sume XNT + ≈USD. Token bez puli daje „— ?",
+nie wchodzi do sumy i jest wypisany jako „bez X, Y" — tak samo jak w
+`value_xnt` po stronie backendu, wiec obie liczby sie zgadzaja.
 
 ## Zakladki widoku i ukrywanie
 

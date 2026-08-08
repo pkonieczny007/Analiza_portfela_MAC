@@ -42,8 +42,15 @@ def _rpc(method: str, params: list[Any], timeout: float = 20.0) -> Any:
 
 # ---------------------------------------------------------------- sygnatury
 
-def fetch_new_signatures(wallet: str, until_sig: str | None, max_pages: int = 20) -> list[str]:
-    """Nowe sygnatury (od najstarszej do najnowszej), az do znanej `until_sig`."""
+def fetch_new_signatures(wallet: str, until_sig: str | None, max_pages: int = 20,
+                         since_ts: int | None = None) -> list[str]:
+    """Nowe sygnatury (od najstarszej do najnowszej), az do znanej `until_sig`.
+
+    `since_ts` (unix) ucina historie: RPC zwraca sygnatury od najnowszej, wiec
+    pierwszy wiersz starszy niz `since_ts` konczy przegladanie — dalej sa same
+    starsze. To ta jedna linijka decyduje, czy pierwszy sync portfela trwa
+    sekundy czy kwadranse, bo odsiewamy PRZED kosztownym getTransaction.
+    """
     sigs: list[str] = []
     before: str | None = None
     for _ in range(max_pages):
@@ -53,10 +60,15 @@ def fetch_new_signatures(wallet: str, until_sig: str | None, max_pages: int = 20
         if until_sig:
             params[1]["until"] = until_sig
         rows = _rpc("getSignaturesForAddress", params) or []
+        too_old = False
         for row in rows:
+            bt = row.get("blockTime")
+            if since_ts is not None and bt is not None and bt < since_ts:
+                too_old = True
+                break
             if row.get("err") is None:
                 sigs.append(row["signature"])
-        if len(rows) < 1000:
+        if too_old or len(rows) < 1000:
             break
         before = rows[-1]["signature"]
     sigs.reverse()
@@ -135,13 +147,31 @@ def parse_swap(tx: dict, wallet: str) -> Optional[dict]:
 
 
 def sync_wallet(con, wallet: str, sleep_s: float = 0.12,
-                wallet_id: int | None = None) -> dict:
-    """Pobiera nowe transakcje portfela i zapisuje swapy do DB."""
+                wallet_id: int | None = None, since_ts: int | None = None) -> dict:
+    """Pobiera nowe transakcje portfela i zapisuje swapy do DB.
+
+    `since_ts` = nie schodz starzej niz ta data (zwykle filtr z UI).
+
+    Zasieg juz pobrany trzymamy w `meta` pod `sync_since:<wallet>`
+    ('' = cala historia). Gdy uzytkownik cofnie filtr wczesniej niz to, co
+    mamy, kursor `last_sig` jest na ten przebieg ignorowany — inaczej `until`
+    zatrzymalby sie na najnowszej znanej sygnaturze i starsze transakcje
+    nigdy by nie doszly. Duplikaty i tak odrzuca UNIQUE.
+    """
     import db as dbm
 
     meta_key = f"last_sig:{wallet}"
-    until_sig = dbm.meta_get(con, meta_key)
-    sigs = fetch_new_signatures(wallet, until_sig)
+    since_key = f"sync_since:{wallet}"
+    covered = dbm.meta_get(con, since_key)          # None = nigdy, '' = pelna
+    want = None if since_ts is None else int(since_ts)
+
+    backfill = False
+    if covered is not None and covered != "":
+        if want is None or want < int(covered):
+            backfill = True
+
+    until_sig = None if backfill else dbm.meta_get(con, meta_key)
+    sigs = fetch_new_signatures(wallet, until_sig, since_ts=want)
     added, skipped, errors = 0, 0, 0
     for sig in sigs:
         try:
@@ -170,6 +200,13 @@ def sync_wallet(con, wallet: str, sleep_s: float = 0.12,
     # sync sprawdzi te sygnatury ponownie (duplikaty odrzuca UNIQUE)
     if sigs and errors == 0:
         dbm.meta_set(con, meta_key, sigs[-1])
+    if errors == 0:
+        # zasieg = najwczesniejsza data, ktora mamy pokryta ('' = cala historia)
+        if want is None or covered == "":
+            dbm.meta_set(con, since_key, "")
+        else:
+            have = want if covered is None else min(int(covered), want)
+            dbm.meta_set(con, since_key, str(have))
     con.commit()
     return {"checked": len(sigs), "added": added, "skipped": skipped, "errors": errors}
 

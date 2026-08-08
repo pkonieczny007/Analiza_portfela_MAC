@@ -3,6 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 const COLORS = ["#4da3ff", "#3fb950", "#d29922", "#b57bff", "#f85149", "#39c5cf"];
+const SYMS = ["XNT", "ANL", "XNM", "USDC.x"];   // kolejnosc kolumn tabeli portfeli
 let SHOW_HIDDEN = false;
 
 function fmt(x, d = 4) {
@@ -29,11 +30,13 @@ async function api(path, opts = {}) {
   return data;
 }
 
-let XNT_USD = null; // kurs XNT->USD (moze byc syntetyczny)
+let XNT_USD = null;   // kurs XNT->USD (moze byc syntetyczny)
+let PRICES = {};      // {symbol: cena w XNT} — z /api/balances (items)
 
 async function load() {
   const data = await api("/api/balances" + (SHOW_HIDDEN ? "?hidden=1" : ""));
   XNT_USD = data.xnt_usd;
+  PRICES = Object.fromEntries(data.items.map(it => [it.symbol, it.price_xnt]));
   $("#total").textContent = fmt(data.total_xnt, 2);
   $("#total-usd").textContent = XNT_USD
     ? `≈ ${fmt(data.total_xnt * XNT_USD, 2)} USDC.x (orientacyjnie)`
@@ -71,6 +74,63 @@ function walletRow(w) {
   </tr>`;
 }
 
+/* Sumy per token po liscie portfeli. Portfele bez odczytanych sald
+   (ukryte, gdy RPC nie bylo odpytane) sa pomijane; token, ktorego nikt
+   nie ma, zostaje null -> „—" zamiast mylacego zera. */
+function sumBalances(list) {
+  const out = {};
+  for (const w of list) {
+    if (!w.balances) continue;
+    for (const sym of SYMS) {
+      const v = w.balances[sym];
+      if (v != null) out[sym] = (out[sym] || 0) + v;
+    }
+  }
+  return out;
+}
+
+function sumCells(list, total_all) {
+  const sums = sumBalances(list);
+  const value = list.reduce((a, w) => a + (w.value_xnt || 0), 0);
+  const pct = total_all ? (value / total_all * 100) : null;
+  const cells = SYMS.map(sym =>
+    `<td class="r mono">${fmt(sums[sym], sym === "USDC.x" ? 3 : 1)}</td>`).join("");
+  const usd = XNT_USD ? `<div class="muted" style="font-size:11px">≈ ${fmt(value * XNT_USD, 2)} $</div>` : "";
+  return `${cells}
+    <td class="r mono">${fmt(value, 2)}${usd}</td>
+    <td class="r mono">${pct != null ? pct.toFixed(1) + " %" : "—"}</td>`;
+}
+
+/* Powtarzany pasek z symbolami — przy dlugiej tabeli widac,
+   ktora kolumna to ktory token (wzor: SKRYPT_PORTFELE-wersja2). */
+function symbolRow() {
+  return `<tr class="symrow"><td></td><td></td>` +
+    SYMS.map(s => `<td class="r">${s}</td>`).join("") +
+    `<td class="r">wartość</td><td class="r">udział</td><td></td></tr>`;
+}
+
+/* Kazdy token przeliczony na XNT + suma po prawej. Tokeny bez puli
+   (brak ceny) zostaja jako „—" i nie wchodza do sumy. */
+function xntRow(list) {
+  const sums = sumBalances(list);
+  let total = 0;
+  const skipped = [];
+  const cells = SYMS.map(sym => {
+    const amt = sums[sym], p = PRICES[sym];
+    if (amt == null) return `<td class="r mono muted">—</td>`;
+    if (p == null) {
+      skipped.push(sym);
+      return `<td class="r mono muted" title="brak puli — poza sumą">— <span style="font-size:10px">?</span></td>`;
+    }
+    total += amt * p;
+    return `<td class="r mono" title="1 ${sym} ≈ ${fmt(p, 9)} XNT">${fmt(amt * p, 2)}</td>`;
+  }).join("");
+  const usd = XNT_USD ? `<div class="muted" style="font-size:11px">≈ ${fmt(total * XNT_USD, 2)} $</div>` : "";
+  const warn = skipped.length ? `<div class="muted" style="font-size:10px">bez ${skipped.join(", ")}</div>` : "";
+  return `<tr class="xntrow"><td></td><td>≈ w XNT</td>${cells}
+    <td class="r mono"><b>${fmt(total, 2)} XNT</b>${usd}${warn}</td><td></td><td></td></tr>`;
+}
+
 function renderWallets(data) {
   const tbody = $("#tbl-wallets tbody");
   const rows = [];
@@ -82,13 +142,25 @@ function renderWallets(data) {
     if (!seen.has(key)) seen.set(key, []);
     seen.get(key).push(w);
   }
+  // baza udzialow: suma wyswietlanych portfeli (z ukrytymi, gdy sa pokazane)
+  const total_all = wallets.reduce((a, w) => a + (w.value_xnt || 0), 0);
   for (const [grp, list] of seen) {
-    if (grp) {
-      const sum = list.reduce((a, w) => a + (w.value_xnt || 0), 0);
-      rows.push(`<tr class="grp-row"><td colspan="6">📁 ${esc(grp)}</td>
-        <td class="r mono">${fmt(sum, 2)}</td><td colspan="2"></td></tr>`);
+    // naglowek grupy = jednoczesnie jej suma; przy jednej grupie bez nazwy
+    // pominiety, bo dublowalby SUME calkowita
+    if (grp || seen.size > 1) {
+      rows.push(symbolRow());
+      rows.push(`<tr class="grp-row"><td></td>
+        <td>📁 ${esc(grp || "bez grupy")} <span class="wallets-badge">(${list.length})</span></td>
+        ${sumCells(list, total_all)}<td></td></tr>`);
     }
     for (const w of list) rows.push(walletRow(w));
+  }
+  if (wallets.length) {
+    rows.push(symbolRow());
+    rows.push(`<tr class="total-row"><td></td>
+      <td><b>SUMA</b>${SHOW_HIDDEN ? ` <span class="wallets-badge">(z ukrytymi)</span>` : ""}</td>
+      ${sumCells(wallets, total_all)}<td></td></tr>`);
+    rows.push(xntRow(wallets));
   }
   tbody.innerHTML = rows.join("") || `<tr><td colspan="9" class="muted">brak portfeli — dodaj pierwszy</td></tr>`;
 }
