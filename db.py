@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS multi_order (
     dry_run INTEGER NOT NULL DEFAULT 1,
     status TEXT NOT NULL DEFAULT 'running',
     note TEXT,
-    hidden INTEGER NOT NULL DEFAULT 0
+    hidden INTEGER NOT NULL DEFAULT 0,
+    min_interval_s INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS multi_slice (
     id INTEGER PRIMARY KEY,
@@ -74,6 +75,7 @@ CREATE TABLE IF NOT EXISTS multi_slice (
     amount REAL NOT NULL,
     scheduled_at INTEGER NOT NULL,
     price_offset_pct REAL NOT NULL DEFAULT 0,
+    min_gap_s INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'pending',
     executed_price REAL,
     tx_signature TEXT,
@@ -108,6 +110,15 @@ def init() -> None:
             )
         default_id = con.execute("SELECT id FROM wallet ORDER BY sort, id").fetchone()["id"]
         con.execute("UPDATE tx SET wallet_id=? WHERE wallet_id IS NULL", (default_id,))
+        # migracja: minimalny odstep miedzy transzami (0 = stare zachowanie)
+        cols = [r["name"] for r in con.execute("PRAGMA table_info(multi_order)")]
+        if "min_interval_s" not in cols:
+            con.execute("ALTER TABLE multi_order ADD COLUMN "
+                        "min_interval_s INTEGER NOT NULL DEFAULT 0")
+        cols = [r["name"] for r in con.execute("PRAGMA table_info(multi_slice)")]
+        if "min_gap_s" not in cols:
+            con.execute("ALTER TABLE multi_slice ADD COLUMN "
+                        "min_gap_s INTEGER NOT NULL DEFAULT 0")
         con.commit()
 
 

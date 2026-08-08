@@ -167,6 +167,9 @@ select.mini, .tbl select { background: var(--panel2); color: var(--text);
 .seg button.on { background: #1f4d80; color: #fff; font-weight: 600; }
 .trade-preview { margin-top: 12px; padding: 10px 12px; background: var(--panel2);
   border: 1px solid var(--border); border-radius: 8px; font-size: 13px; line-height: 1.6; }
+/* ostrzezenie w podgladzie zlecenia (np. przerwy nie mieszcza sie w oknie) */
+.warn-line { margin-top: 6px; padding: 6px 8px; border-radius: 6px;
+  background: #3a2b12; color: var(--amber); border: 1px solid #5c451c; font-size: 12px; }
 .order-card { background: var(--panel2); border: 1px solid var(--border);
   border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
 .o-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }

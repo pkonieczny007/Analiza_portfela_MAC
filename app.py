@@ -482,6 +482,7 @@ def api_multibot_create():
             trigger_mode=body.get("trigger_mode", "time_price"),
             weights=body.get("weights"), offsets=body.get("offsets"),
             time_weights=body.get("time_weights"),
+            min_interval_s=int(float(body.get("min_interval_s") or 0)),
             slippage_bps=settings["slippage_bps"], dry_run=settings["dry_run"],
             note=body.get("note"),
         )

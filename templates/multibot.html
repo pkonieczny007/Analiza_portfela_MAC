@@ -59,6 +59,12 @@
         <label class="field">Czas trwania (min)<input id="mb-window" type="number" step="1" min="1" value="30"></label>
       </div>
 
+      <label class="field" id="mb-interval-box">Min. odstęp transz (min)
+        <input id="mb-interval" type="number" step="0.5" min="0" value="0"
+               placeholder="0 = bez odstępu">
+        <span class="muted small-note" id="mb-interval-help" style="margin:4px 0 0"></span>
+      </label>
+
       <label class="field">Notatka<input id="mb-note" placeholder="opcjonalnie"></label>
 
       <div id="mb-preview" class="trade-preview muted"></div>
@@ -97,7 +103,7 @@
 
     <div class="dist-group" data-group="time">
       <div class="dist-head">
-        <b>Czas — odstępy transz</b>
+        <b id="mb-time-title">Czas — odstępy transz</b>
         <span class="spacer"></span>
         <button type="button" class="btn small" data-even="time">Równo</button>
         <button type="button" class="btn small" data-mix="time">🎲 Mix</button>

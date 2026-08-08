@@ -102,7 +102,34 @@ i suwakiem skosu (rampa od pierwszej do ostatniej transzy):
   przyciskow ±1/±5 z BOT_AGG1).
 
 Wyzwalacz steruje widocznoscia grup: `time` — tylko suwaki czasu (ceny stale),
-`price` — tylko suwaki ceny (czas staly), `time_price` — oba.
+`price` i `time_price` — oba komplety (w `price` suwaki czasu dziela minimalne
+przerwy, patrz nizej).
+
+### Minimalny odstep miedzy transzami (cooldown)
+
+W trybie cenowym nie ma harmonogramu — bez hamulca wszystkie transze lapia
+warunek w tym samym przebiegu i leca w jednej sekundzie (a `min_out` kazdej
+liczony jest z ceny sprzed pierwszej, wiec kolejne rewertuja po ruchu puli).
+Dlatego:
+- pole **„Min. odstep transz (min)"** -> `multi_order.min_interval_s`
+  (migracja ALTER TABLE w `db.init()`; 0 = stare zachowanie),
+- `multibot._slice_gaps` rozdziela to na transze **wagami czasu**: budzet
+  `interwal * (n-1)` dzielony pierwszymi n-1 wagami, wiec przy rownych
+  suwakach kazda przerwa = ustawiony interwal, a mix zmienia rytm nie sume.
+  Wynik ladzie w `multi_slice.min_gap_s` (`out[0]=0` — pierwsza nie czeka),
+- `process_due_slices`: po fillu zlecenie spi `min_gap_s` **nastepnej w
+  kolejce** transzy (`MAX(filled_at)` + gap), a poza tym wykonuje
+  **maksymalnie jedna transze na przebieg na zlecenie** (`break`) — dzieki
+  temu kolejna dostaje swiezo pobrana cene. To dziala takze przy
+  `min_interval_s = 0`, wiec stare zlecenia tez przestaja strzelac salwa,
+- transza, ktorej cooldown nie minal do konca okna, dostaje `skipped`
+  z powodem „min. odstep miedzy transzami nie minal do konca okna".
+  UI ostrzega z gory, gdy `suma przerw > okno` (pasek w podgladzie
+  + `confirm` przy uruchomieniu).
+
+Cooldown obowiazuje we wszystkich trybach — w `time`/`time_price` jest
+dodatkowa blokada ponad harmonogram (zwykle nieaktywna, bo odstepy planu
+sa dluzsze).
 
 **🔗 Lacz = sprzezenie grup** (nie blokada): wlaczone w >=2 grupach powoduje,
 ze ruch suwaka transzy `i` przesuwa te sama transze w pozostalych polaczonych

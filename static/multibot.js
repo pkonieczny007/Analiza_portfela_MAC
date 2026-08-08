@@ -97,11 +97,17 @@ function setTrigger(t) {
     b.classList.toggle("on", b.dataset.trig === t));
   $("#mb-trigger-help").textContent = TRIGGER_HELP[t];
   $("#mb-range-box").style.display = t === "time" ? "none" : "";
-  // czasowy -> tylko suwaki czasu; cenowy -> tylko suwaki ceny; oba -> podwojne
-  $("#mb-rows").classList.toggle("no-time", t === "price");
+  // Suwaki czasu zostaja TEZ w trybie cenowym — tam nie ustawiaja godzin,
+  // tylko dziela minimalny odstep miedzy transzami (rytm cooldownu).
+  $("#mb-rows").classList.remove("no-time");
   $("#mb-rows").classList.toggle("no-price", t === "time");
-  $('#mb-dist .dist-group[data-group="time"]').style.display = t === "price" ? "none" : "";
+  $('#mb-dist .dist-group[data-group="time"]').style.display = "";
   $('#mb-dist .dist-group[data-group="price"]').style.display = t === "time" ? "none" : "";
+  $("#mb-time-title").textContent = t === "price"
+    ? "Czas — minimalne odstępy" : "Czas — odstępy transz";
+  $("#mb-interval-help").textContent = t === "price"
+    ? "W trybie cenowym to jedyny hamulec: bez odstępu wszystkie transze złapią warunek naraz i wykonają się w tej samej sekundzie."
+    : "Dodatkowa blokada ponad harmonogram — kolejna transza nie ruszy szybciej niż tyle po poprzedniej.";
   refresh();
 }
 
@@ -246,7 +252,20 @@ function planData() {
   const times = [];
   let acc = start;
   for (let i = 0; i < n; i++) { times.push(Math.round(acc)); acc += gaps[i]; }
-  return { total, n, start, end: start + win, win, amounts, shares, gaps, times };
+
+  // minimalne odstepy — lustro multibot._slice_gaps: budzet = interwal*(n-1)
+  // rozdzielony pierwszymi n-1 wagami czasu, wiec przy rownych wagach kazdy
+  // odstep = dokladnie ustawiony interwal
+  const minInterval = Math.max(0, parseFloat($("#mb-interval").value) || 0) * 60;
+  const minGaps = new Array(n).fill(0);
+  if (n > 1 && minInterval > 0) {
+    const head = W.time.slice(0, n - 1);
+    const sumH = sum(head) || (n - 1);
+    const budget = minInterval * (n - 1);
+    for (let i = 1; i < n; i++) minGaps[i] = Math.round(budget * head[i - 1] / sumH);
+  }
+  return { total, n, start, end: start + win, win, amounts, shares, gaps, times,
+           minInterval, minGaps };
 }
 
 function effRange(i) {
@@ -259,7 +278,7 @@ function effRange(i) {
 }
 
 function refresh() {
-  const { total, n, amounts, shares, gaps, times } = planData();
+  const { total, n, amounts, shares, gaps, times, win, minInterval, minGaps } = planData();
   const unit = SIDE === "buy" ? "XNT" : window.TOKEN;
 
   // etykiety przy suwakach
@@ -270,7 +289,12 @@ function refresh() {
         `<span class="wpct">${(shares[i] * 100).toFixed(1)}%</span>`;
     }
     const tm = $(`#mb-rows .wval[data-v="time-${i}"]`);
-    if (tm) tm.innerHTML = `${fmtHM(times[i])} <span class="wpct">+${(gaps[i] / 60).toFixed(1)} min</span>`;
+    if (tm) {
+      tm.innerHTML = TRIGGER === "price"
+        ? (i === 0 ? `<span class="wpct">bez czekania</span>`
+          : `min. <span class="wpct">${(minGaps[i] / 60).toFixed(1)} min</span> przerwy`)
+        : `${fmtHM(times[i])} <span class="wpct">+${(gaps[i] / 60).toFixed(1)} min</span>`;
+    }
     const pr = $(`#mb-rows .wval[data-v="price-${i}"]`);
     if (pr) {
       const o = W.price[i] || 0;
@@ -279,10 +303,10 @@ function refresh() {
     }
   }
 
-  renderPlan({ total, n, amounts, gaps, times, unit });
+  renderPlan({ total, n, amounts, gaps, times, unit, win, minInterval, minGaps });
 }
 
-function renderPlan({ total, n, amounts, gaps, times, unit }) {
+function renderPlan({ total, n, amounts, gaps, times, unit, win, minInterval, minGaps }) {
   if (!(total > 0)) {
     $("#mb-plan").innerHTML = `<span class="muted">Podaj ilość, aby zobaczyć plan.</span>`;
     $("#mb-preview").textContent = "";
@@ -290,18 +314,22 @@ function renderPlan({ total, n, amounts, gaps, times, unit }) {
   }
   const showTime = TRIGGER !== "price";
   const showOff = TRIGGER !== "time";
+  const showGap = minInterval > 0;
   const hasRange = showOff && ($("#mb-pmin").value || $("#mb-pmax").value);
   const rows = [];
   for (let i = 0; i < n; i++) {
     rows.push(`<tr><td>#${i + 1}</td><td class="mono">${fmt(amounts[i], 6)} ${unit}</td>
       ${showTime ? `<td class="muted">${fmtTime(times[i])}</td>
                     <td class="mono muted">${(gaps[i] / 60).toFixed(1)} min</td>` : ""}
+      ${showGap ? `<td class="mono muted">${i === 0 ? "—"
+                    : "≥ " + (minGaps[i] / 60).toFixed(1) + " min"}</td>` : ""}
       ${showOff ? `<td class="mono">${(W.price[i] > 0 ? "+" : "") + (W.price[i] || 0)}%</td>` : ""}
       ${hasRange ? `<td class="mono muted">${effRange(i)}</td>` : ""}</tr>`);
   }
   $("#mb-plan").innerHTML = `<table class="tbl"><thead><tr>
       <th>Transza</th><th>Ilość</th>
       ${showTime ? "<th>Planowana na</th><th>Odstęp</th>" : ""}
+      ${showGap ? "<th>Min. przerwa</th>" : ""}
       ${showOff ? "<th>±%</th>" : ""}
       ${hasRange ? "<th>Zakres transzy</th>" : ""}</tr></thead>
       <tbody>${rows.join("")}</tbody></table>`;
@@ -309,15 +337,25 @@ function renderPlan({ total, n, amounts, gaps, times, unit }) {
   const pmin = $("#mb-pmin").value, pmax = $("#mb-pmax").value;
   const range = (showOff && (pmin || pmax)) ? ` w zakresie ${pmin || "—"}..${pmax || "—"} XNT` : "";
   const trigTxt = { time_price: "czasowo-cenowy", time: "czasowy", price: "cenowy" }[TRIGGER];
+  // suma minimalnych przerw musi zmiescic sie w oknie — inaczej ostatnie
+  // transze dostana 'skipped', gdy okno minie
+  const needed = sum(minGaps);
+  const warn = needed > win
+    ? `<div class="warn-line">⚠ Przy tej przerwie ostatnie transze nie zdążą:
+       potrzeba ≥ <b>${(needed / 60).toFixed(0)} min</b> okna, a masz
+       <b>${(win / 60).toFixed(0)} min</b>. Wydłuż czas trwania albo skróć odstęp.</div>`
+    : "";
+  const gapTxt = minInterval > 0
+    ? `, min. przerwa <b>${(minInterval / 60).toFixed(1)} min</b>` : "";
   $("#mb-preview").innerHTML =
     `${SIDE === "buy" ? "Kupno za" : "Sprzedaż"} <b>${fmt(total, 6)} ${unit}</b>
-     w ${n} transzach${range}, wyzwalacz <b>${trigTxt}</b>,
-     tryb <b>${SETTINGS?.dry_run ? "DRY-RUN" : "LIVE"}</b>.`;
+     w ${n} transzach${range}, wyzwalacz <b>${trigTxt}</b>${gapTxt},
+     tryb <b>${SETTINGS?.dry_run ? "DRY-RUN" : "LIVE"}</b>.${warn}`;
 }
 
 // ---------------------------------------------------------------- bindy formularza
 
-["mb-amount", "mb-start-in", "mb-window", "mb-pmin", "mb-pmax"]
+["mb-amount", "mb-start-in", "mb-window", "mb-pmin", "mb-pmax", "mb-interval"]
   .forEach(id => $("#" + id).addEventListener("input", refresh));
 document.querySelectorAll("#mb-side button").forEach(b =>
   b.addEventListener("click", () => setSide(b.dataset.side)));
@@ -406,6 +444,7 @@ function orderCard(o) {
         <span>Zakres: <b>${o.price_min ?? "—"} .. ${o.price_max ?? "—"}</b></span>
         <span>Wyzwalacz: <b>${o.trigger_mode}</b></span>
         <span>Okno: <b>${fmtTime(o.window_start)} – ${fmtTime(o.window_end)}</b></span>
+        ${o.min_interval_s ? `<span>Min. przerwa: <b>${(o.min_interval_s / 60).toFixed(1)} min</b></span>` : ""}
         <span>Klucz: <b>${esc(o.key_file)}</b></span>
         ${sigs ? `<span>Transakcji on-chain: <b>${sigs}</b></span>` : ""}
         ${o.note ? `<span>Notatka: ${esc(o.note)}</span>` : ""}
@@ -443,8 +482,12 @@ window.deleteOrder = async (id) => {
 
 $("#mb-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const { total, n, start, end } = planData();
+  const { total, n, start, end, win, minInterval, minGaps } = planData();
   if (!(total > 0)) return toast("Podaj ilość", "err");
+  if (sum(minGaps) > win &&
+      !confirm(`Minimalne przerwy (${(sum(minGaps) / 60).toFixed(0)} min) nie mieszczą się ` +
+               `w oknie ${(win / 60).toFixed(0)} min — ostatnie transze zostaną pominięte. ` +
+               `Uruchomić mimo to?`)) return;
   const key_file = $("#mb-key").value;
   if (!key_file) return toast("Brak klucza w katalogu wallet/", "err");
 
@@ -464,6 +507,7 @@ $("#mb-form").addEventListener("submit", async (e) => {
         trigger_mode: TRIGGER,
         weights: W.size.slice(0, n),
         time_weights: W.time.slice(0, n),
+        min_interval_s: Math.round(minInterval),
         offsets: TRIGGER === "time" ? W.price.map(() => 0) : W.price.slice(0, n),
         price_min: TRIGGER === "time" ? null : ($("#mb-pmin").value || null),
         price_max: TRIGGER === "time" ? null : ($("#mb-pmax").value || null),
