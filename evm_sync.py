@@ -48,7 +48,13 @@ MIN_WINDOW = 200
 # Bez filtra dat nie schodzimy w cala historie lancucha (Base ma >30 mln
 # blokow — to tysiace zapytan na publicznym RPC). Domyslny zasieg pierwszego
 # syncu; wczesniejsze transakcje dociaga ustawienie filtra "od" w UI.
-DEFAULT_LOOKBACK_DAYS = 7
+#
+# Ograniczeniem NIE jest miejsce na dysku — jedna transakcja to ~230 bajtow,
+# wiec rok bardzo aktywnego handlu miesci sie w ~1,3 MB. Kosztem jest CZAS:
+# Base bije blok co 2 s, czyli ~43 tys. blokow na dobe, a kazde okno to
+# osobne zapytanie do RPC (doba ~30 s na publicznym endpoincie, tydzien ~4 min).
+# Stad domyslnie jedna doba — swieze transakcje od reki, reszta na zadanie.
+DEFAULT_LOOKBACK_DAYS = 1
 BLOCK_TIME_S = 2.0     # Base bije bloki co rowno 2 s — do estymaty bloku z daty
 
 

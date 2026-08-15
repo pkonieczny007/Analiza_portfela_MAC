@@ -197,7 +197,18 @@ class SwapResult:
     tx_hash: str | None = None
     approve_hash: str | None = None
     gas_limit: int = 0
+    pay_native: bool = False     # True = zaplacono natywnym ETH (bez approve)
     note: str = ""
+
+
+def gas_reserve_eth(gas_limit: int | None = None) -> float:
+    """Ile ETH trzeba zostawic na oplacenie transakcji.
+
+    Liczone z GORNEGO limitu gazu i biezacej ceny — lepiej zablokowac zlecenie
+    o wlos za duze niz wyslac transakcje, ktora zabraknie paliwa w polowie.
+    """
+    fees = ec.fee_params()
+    return (gas_limit or cfg.GAS_LIMIT_SWAP) * fees["max_fee_per_gas"] / 1e18
 
 
 def sides() -> tuple[str, str]:
@@ -229,9 +240,12 @@ def execute_swap(*, side: str, amount_in: float, account,
                  use_native: bool = True) -> SwapResult:
     """Jeden swap na Uniswap v3.
 
-    `use_native`: gdy placimy WETH, wysylamy natywny ETH jako `value` — router
-    sam go opakuje (ma WETH9/refundETH w kodzie), wiec odpada `approve`
-    i trzymanie opakowanego WETH. Przy placeniu USDC zawsze idzie ERC-20.
+    `use_native`: gdy placimy WETH, domyslnie wysylamy natywny ETH jako `value`
+    — router opakuje go sam (ma WETH9/refundETH w kodzie), wiec uzytkownik NIE
+    musi recznie zamieniac ETH na WETH ani robic `approve`. Gdy natywnego ETH
+    nie starcza, a na koncie lezy juz opakowany WETH, przelaczamy sie na sciezke
+    ERC-20 — inaczej posiadacz WETH dostawalby "za malo ETH" mimo pelnego salda.
+    Przy placeniu USDC zawsze idzie ERC-20.
     """
     Account = _account_mod()
     slippage_bps = cfg.SLIPPAGE_BPS_DEFAULT if slippage_bps is None else slippage_bps
@@ -245,7 +259,7 @@ def execute_swap(*, side: str, amount_in: float, account,
                            f"{cfg.FEE_TIERS_TO_QUOTE}")
     amount_in_raw = q["amount_in_raw"]
     min_out_raw = _min_out_raw(q["amount_out_raw"], slippage_bps)
-    pay_native = use_native and t_in == cfg.BASE_TOKEN and cfg.TOKENS[t_in]["native"]
+    can_native = use_native and t_in == cfg.BASE_TOKEN and cfg.TOKENS[t_in]["native"]
 
     res = SwapResult(
         dry_run=dry_run, side=side, amount_in=amount_in,
@@ -253,15 +267,39 @@ def execute_swap(*, side: str, amount_in: float, account,
         fee_tier=q["fee"],
     )
 
-    # --- bezpiecznik: czy jest czym zaplacic
-    if pay_native:
-        have = ec.native_balance(account.address)
-        if have < amount_in:
-            raise RuntimeError(f"Za malo ETH: masz {have:.6f}, potrzeba {amount_in}")
+    # Rezerwa na gaz liczona z GORNEGO limitu i biezacej ceny gazu. Bez niej
+    # sprzedaz "calego ETH" przechodzi walidacje, a potem transakcja nie ma
+    # z czego oplacic wlasnego wykonania.
+    gas_reserve = gas_reserve_eth()
+    native = ec.native_balance(account.address)
+
+    if can_native:
+        wrapped = ec.erc20_balance(t_in, account.address)
+        if native >= amount_in + gas_reserve:
+            pay_native = True
+        elif wrapped >= amount_in and native >= gas_reserve:
+            # ETH nie starcza, ale opakowany WETH juz na koncie lezy
+            pay_native = False
+        elif native + wrapped >= amount_in + gas_reserve:
+            raise RuntimeError(
+                f"Srodki sa rozbite: {native:.6f} ETH + {wrapped:.6f} WETH. "
+                f"Zamien czesc na jedna forme albo zmniejsz kwote.")
+        else:
+            raise RuntimeError(
+                f"Za malo srodkow: masz {native:.6f} ETH i {wrapped:.6f} WETH, "
+                f"potrzeba {amount_in} + {gas_reserve:.6f} na gaz")
     else:
+        pay_native = False
         have = ec.erc20_balance(t_in, account.address)
         if have < amount_in:
             raise RuntimeError(f"Za malo {t_in}: masz {have}, potrzeba {amount_in}")
+
+    # Gaz placi sie ZAWSZE natywnym ETH, takze przy swapie tokena ERC-20.
+    if native < gas_reserve:
+        raise RuntimeError(
+            f"Brak ETH na gaz: masz {native:.8f}, potrzeba okolo "
+            f"{gas_reserve:.8f} (na Base gaz placi sie ETH)")
+    res.pay_native = pay_native
 
     swap_data = encode_exact_input_single(
         token_in=t_in, token_out=t_out, fee=q["fee"], recipient=account.address,
