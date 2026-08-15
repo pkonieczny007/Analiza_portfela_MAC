@@ -24,6 +24,21 @@ log = logging.getLogger("portfel")
 app = Flask(__name__)
 dbm.init()
 
+# Zakladka ETH (Uniswap v3 na Base) — osobny blueprint, wlasne trasy /api/eth/*.
+# Import jest miekki: brak eth-account nie moze wywalic calej czesci X1.
+try:
+    from evm_api import bp as evm_bp
+    app.register_blueprint(evm_bp)
+    HAS_EVM = True
+except Exception as e:  # noqa: BLE001
+    logging.getLogger("portfel").warning("Zakladka ETH niedostepna: %s", e)
+    HAS_EVM = False
+
+
+@app.context_processor
+def _inject_evm_flag():
+    return {"has_evm": HAS_EVM}
+
 # prosty cache ceny (RPC nie jest darmowe czasowo)
 _price_cache: dict = {"t": 0.0, "price": None, "xnt_usd": None}
 PRICE_TTL_S = 20

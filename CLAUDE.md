@@ -139,6 +139,49 @@ wiec srodek suwaka = 0 %. Mix, Rowno i skos w polaczonej grupie tez przenosza
 uklad na pozostale; wlaczenie „Lacz" przejmuje uklad od juz polaczonej grupy.
 Zmiana liczby transz resetuje rozklad do rownego.
 
+## Zakladka ETH — Uniswap v3 na Base (EVM)
+
+DRUGA siec obok X1, nie przelacznik: obie zyja rownolegle, `app.py` rejestruje
+blueprint dwoma linijkami (import miekki — brak `eth-account` nie moze wywalic
+czesci X1) i nic wiecej o EVM nie wie.
+
+- `evm_config.py` — Base (chainId 8453), para WETH/USDC, adresy pul/routera.
+  **Wszystkie adresy odczytane z lancucha**, nie z dokumentacji: pule z
+  `factory.getPool()`, router/quoter potwierdzone przez `factory()` == ta sama
+  fabryka v3. USDC ma **6 decimals**, WETH 18 — pomylka to blad rzedu 1e12.
+- `evm_chain.py` — surowy JSON-RPC (jak `chain.py` unika solana-py, tak tu
+  unikamy `web3.py`; z zewnatrz tylko `eth_utils.keccak` na selektory).
+  `_rpc` ma backoff na HTTP 429, bo publiczny `mainnet.base.org` dlawi juz
+  przy kilkunastu wywolaniach pod rzad.
+- `evm_trading.py` — klucze secp256k1, `approve`, `exactInputSingle`, EIP-1559.
+- `evm_api.py` — blueprint: `/eth` + `/api/eth/{settings,price,quote,balances,trade}`.
+- UI: `templates/eth.html` + `static/eth.js`.
+
+**Tier oplaty NIE jest ustawiony na sztywno.** W v3 o poslizgu decyduje
+plynnosc skupiona przy biezacym ticku, a nie saldo puli — zmierzone: tier
+0,05% bije 0,30% na kazdej wielkosci, mimo ze pula 0,30% ma 3x grubsze saldo.
+Dlatego kazde zlecenie odpytuje QuoterV2 o `FEE_TIERS_TO_QUOTE` i bierze
+lepsza wycene.
+
+**`exactInputSingle` w SwapRouter02 nie ma `deadline` w strukturze** —
+sprawdzone szukaniem selektora w bajtkodzie routera (`0x04e45aaf` jest,
+wariant z deadline `0x414bf389` nie ma go). Termin waznosci idzie wiec przez
+`multicall(uint256,bytes[])`. Pojscie za dokumentacja SwapRouter01 dawaloby
+rewert dopiero na lancuchu, po zaplaceniu gazu.
+
+Klucze: katalog `wallet_evm/` **oddzielny** od `wallet/`, bo secp256k1 != ed25519.
+Format po zawartosci: hex 64 znaki (MetaMask), tablica JSON 32 bajtow (zapis
+jak w X1, dla spojnosci), keystore V3 (haslo z `EVM_KEYSTORE_PASSWORD`).
+Tablica 64 bajtow jest ODRZUCANA z komunikatem, ze to klucz solanowy — inaczej
+ktos podpisalby transakcje EVM kluczem z drugiej sieci.
+
+Bezpieczniki jak w X1, ale **wlasne**: DRY-RUN i poslizg siedza w `meta` pod
+kluczami `eth_*`, wiec przelaczenie X1 w LIVE nie uzbraja zakladki ETH ani
+odwrotnie (test potwierdza izolacje). Dwustopniowe zatwierdzanie: POST bez
+`confirm` zwraca sama wycene. Placac w ETH `approve` odpada — router opakowuje
+natywny ETH sam; placac USDC leci osobna transakcja `approve` z czekaniem na
+potwierdzenie.
+
 ## Portfele (multi-wallet)
 
 Tabela `wallet` (address UNIQUE, name, grp, sort, hidden, selected) +

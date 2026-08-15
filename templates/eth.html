@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}ETH — {{ base_token }}/{{ quote_token }} na {{ chain }}{% endblock %}
+{% block content %}
+
+<section class="toolbar">
+  <div class="pricebox">
+    <span class="label">{{ base_token }}/{{ quote_token }} · {{ chain }}</span>
+    <span id="eth-price" class="mono big">—</span>
+  </div>
+  <div class="actions">
+    <span id="eth-mode" class="mode-badge">—</span>
+    <button id="eth-refresh" class="btn">↻ Odśwież</button>
+  </div>
+</section>
+
+<div id="eth-warn" class="muted" style="display:none"></div>
+
+<div class="cols">
+  <section class="card">
+    <div class="card-head"><h2>⇄ Swap na Uniswap v3</h2></div>
+
+    <form id="eth-form" class="trade-form-col">
+      <div class="seg" id="eth-side">
+        <button type="button" data-side="buy" class="on">KUPNO ({{ quote_token }} → {{ base_token }})</button>
+        <button type="button" data-side="sell">SPRZEDAŻ ({{ base_token }} → {{ quote_token }})</button>
+      </div>
+
+      <div class="form-grid2">
+        <label class="field">Klucz podpisujący<select id="eth-key"></select></label>
+        <label class="field">Ilość <span id="eth-unit" class="muted">{{ quote_token }}</span>
+          <input id="eth-amount" type="number" step="any" required placeholder="np. 25"></label>
+        <label class="field">Poślizg (bps)
+          <input id="eth-slippage" type="number" step="1" min="1" max="5000"></label>
+      </div>
+
+      <div class="form-grid2">
+        <label class="switch"><input type="checkbox" id="eth-dry"><span>tryb DRY-RUN</span></label>
+      </div>
+
+      <div id="eth-preview" class="trade-preview muted"></div>
+      <button class="btn primary" id="eth-submit">Wyceń</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>◎ Portfel klucza</h2></div>
+    <div id="eth-balances" class="muted">wybierz klucz</div>
+    <div class="card-head" style="margin-top:14px"><h2>⌗ Wycena po poziomach opłat</h2></div>
+    <div id="eth-tiers" class="muted">podaj ilość, aby porównać pule</div>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>☰ Ostatnie zlecenia (ta sesja)</h2></div>
+  <div id="eth-log" class="muted">brak</div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  window.BASE_TOKEN = "{{ base_token }}";
+  window.QUOTE_TOKEN = "{{ quote_token }}";
+</script>
+<script src="{{ url_for('static', filename='eth.js') }}"></script>
+{% endblock %}
