@@ -31,6 +31,7 @@ _EVM_PARTS = (
     ("evm_api", "handel"),
     ("evm_multibot_api", "multibot"),
     ("evm_pary_api", "pary"),
+    ("evm_portfel_api", "portfel"),
 )
 HAS_EVM_PART: dict[str, bool] = {}
 

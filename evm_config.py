@@ -82,6 +82,13 @@ MAX_TRADE_PCT_OF_BALANCE = 100.0
 GAS_LIMIT_SWAP = 300_000            # zapas ponad typowy exactInputSingle
 PRIORITY_FEE_GWEI_DEFAULT = 0.005   # Base jest tani; nadpisywalne w UI
 
+# TWARDA podloga salda natywnego ETH: zaden swap — ani reczny, ani transza
+# MultiBOT-a — nie moze zejsc ponizej tej kwoty. Wyliczony koszt gazu jednej
+# transakcji to na Base ulamek tego (~0,000003 ETH), ale przy zleceniu
+# wielotranszowym kazda kolejna transza tez musi miec czym zaplacic, a cena
+# gazu potrafi skoczyc. Rezerwa = max(wyliczony gaz, ta podloga).
+MIN_NATIVE_RESERVE_ETH = 0.0001
+
 # Katalog kluczy EVM — ODDZIELNY od solanowego `wallet/`, bo to inna krzywa
 # (secp256k1 zamiast ed25519) i inne formaty plikow.
 EVM_WALLET_DIR = BASE_DIR / "wallet_evm"

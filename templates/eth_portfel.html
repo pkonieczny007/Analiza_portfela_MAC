@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Portfel ETH — salda na {{ chain }}{% endblock %}
+{% block content %}
+
+<section class="toolbar">
+  <div class="pricebox">
+    <span class="label">Suma portfeli ({{ chain }})</span>
+    <span id="ethp-total" class="mono big">—</span> <span class="muted">USD</span>
+    <span id="ethp-price" class="muted mono"></span>
+  </div>
+  <div class="actions">
+    <label class="switch"><input type="checkbox" id="ethp-show-hidden"><span>pokaż ukryte</span></label>
+    <button id="ethp-refresh" class="btn primary">↻ Odśwież</button>
+  </div>
+</section>
+
+<div id="ethp-warn" class="muted" style="display:none"></div>
+
+<section class="card">
+  <div class="card-head">
+    <h2>Portfele</h2>
+    <form id="ethp-form" class="inline">
+      <input id="ethp-address" placeholder="adres 0x…" size="44">
+      <input id="ethp-name" placeholder="nazwa" size="10">
+      <input id="ethp-grp" placeholder="grupa (opcjonalnie)" size="14">
+      <button class="btn small">+ Dodaj portfel</button>
+      <button type="button" id="ethp-from-keys" class="btn small"
+              title="dodaj adresy kluczy z katalogu wallet_evm/">⚿ Z moich kluczy</button>
+    </form>
+  </div>
+  <div class="muted small-note" style="margin-bottom:8px">
+    ☑ zaznaczenie decyduje, które portfele widzi i paruje zakładka „ETH Pary"
+    (i które synchronizuje). 👁 ukrycie chowa portfel z sald.
+    <b>ETH</b> to moneta natywna (płaci gaz), <b>{{ base_token }}</b> to jej wersja
+    opakowana — przy handlu to dwie różne rzeczy.
+  </div>
+  <table class="tbl" id="ethp-tbl">
+    <thead><tr>
+      <th></th><th>Portfel</th>
+      <th class="r">ETH</th><th class="r">{{ base_token }}</th><th class="r">{{ quote_token }}</th>
+      <th class="r">Wartość [USD]</th><th class="r">Udział</th><th></th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<div class="cols">
+  <section class="card">
+    <div class="card-head"><h2>Salda łączne (tokeny)</h2></div>
+    <table class="tbl" id="ethp-bal">
+      <thead><tr>
+        <th>Token</th><th class="r">Ilość</th><th class="r">Cena [USD]</th>
+        <th class="r">Wartość [USD]</th><th class="r">Udział</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="muted small-note">
+      Kurs {{ base_token }} pochodzi z puli Uniswap v3, {{ quote_token }} liczony 1:1 do dolara.
+      Ukryte portfele wchodzą do sum tylko przy włączonym „pokaż ukryte".
+    </p>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Proporcje</h2></div>
+    <canvas id="ethp-pie" width="380" height="380"></canvas>
+    <div id="ethp-legend" class="legend"></div>
+  </section>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  window.BASE_TOKEN = "{{ base_token }}";
+  window.QUOTE_TOKEN = "{{ quote_token }}";
+</script>
+<script src="{{ url_for('static', filename='eth_portfel.js') }}"></script>
+{% endblock %}

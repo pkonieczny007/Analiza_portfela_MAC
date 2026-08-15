@@ -202,13 +202,17 @@ class SwapResult:
 
 
 def gas_reserve_eth(gas_limit: int | None = None) -> float:
-    """Ile ETH trzeba zostawic na oplacenie transakcji.
+    """Ile ETH musi zostac na koncie po swapie.
 
-    Liczone z GORNEGO limitu gazu i biezacej ceny — lepiej zablokowac zlecenie
-    o wlos za duze niz wyslac transakcje, ktora zabraknie paliwa w polowie.
+    Bierzemy WIEKSZA z dwoch wartosci: kosztu tej jednej transakcji (gorny
+    limit gazu razy biezaca cena) i twardej podlogi `MIN_NATIVE_RESERVE_ETH`.
+    Sam koszt jednej transakcji nie wystarczy jako rezerwa — po sprzedazy
+    „do zera plus gaz" kolejna transza MultiBOT-a nie mialaby juz czym
+    zaplacic, a cena gazu miedzy transzami potrafi skoczyc.
     """
     fees = ec.fee_params()
-    return (gas_limit or cfg.GAS_LIMIT_SWAP) * fees["max_fee_per_gas"] / 1e18
+    liczony = (gas_limit or cfg.GAS_LIMIT_SWAP) * fees["max_fee_per_gas"] / 1e18
+    return max(liczony, cfg.MIN_NATIVE_RESERVE_ETH)
 
 
 def sides() -> tuple[str, str]:

@@ -13,6 +13,7 @@
     <a href="/portfel" class="{{ 'active' if request.path == '/portfel' else '' }}">Portfel</a>
     <a href="/multibot" class="{{ 'active' if request.path == '/multibot' else '' }}">MultiBOT</a>
     {% if has_evm %}<a href="/eth" class="{{ 'active' if request.path == '/eth' else '' }}">ETH ⧉</a>{% endif %}
+    {% if has_evm_part and has_evm_part.portfel %}<a href="/eth/portfel" class="{{ 'active' if request.path == '/eth/portfel' else '' }}">ETH Portfel</a>{% endif %}
     {% if has_evm_part and has_evm_part.multibot %}<a href="/eth/multibot" class="{{ 'active' if request.path == '/eth/multibot' else '' }}">ETH MultiBOT</a>{% endif %}
     {% if has_evm_part and has_evm_part.pary %}<a href="/eth/pary" class="{{ 'active' if request.path == '/eth/pary' else '' }}">ETH Pary</a>{% endif %}
     {# zakladki spoza czesci X1 (np. ETH) nie maja sledzonego portfela X1 #}
