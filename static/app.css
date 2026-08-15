@@ -219,3 +219,27 @@ input[type="range"]:disabled { accent-color: var(--border); cursor: not-allowed;
 .toast.err { border-left-color: var(--red); }
 .toast.ok { border-left-color: var(--green); }
 @keyframes fadein { from { opacity: 0; transform: translateY(6px); } }
+
+/* --- MultiBOT ETH --- */
+/* wiersze transz maja wlasny kontener niz w X1, wiec regula chowania
+   kolumn (wyzwalacz czasowy/cenowy) musi byc powtorzona dla #ethmb-rows */
+#ethmb-rows.no-time .wcell.time,
+#ethmb-rows.no-price .wcell.price { display: none; }
+/* kropka transzy z hashem jest linkiem na Basescan — bez tego <a> dostaje
+   podkreslenie i kolor linku zamiast koloru statusu */
+a.sdot { text-decoration: none; }
+a.sdot:hover { outline: 1px solid var(--accent); outline-offset: 1px; }
+/* publiczny RPC to nie blad konfiguracji, tylko ryzyko HTTP 429 —
+   pasek ma byc widoczny, ale slabszy niz .warn-line przy zleceniu */
+.rpc-note { font-size: 12px; color: var(--muted); background: var(--panel);
+  border: 1px solid var(--border); border-left: 3px solid var(--amber);
+  border-radius: 8px; padding: 7px 12px; margin-bottom: 14px; }
+.rpc-note code { color: var(--text); }
+
+/* --- Pary ETH --- */
+/* propozycje portfeli z kluczy wallet_evm/ — chipy do dodania 1 klikiem */
+.key-suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.key-chip { display: inline-flex; align-items: center; gap: 8px;
+  background: var(--panel2); border: 1px dashed var(--border); border-radius: 8px;
+  padding: 5px 10px; font-size: 12px; }
+#ep-form-wallet input { font-size: 12px; }

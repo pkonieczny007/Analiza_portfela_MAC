@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}MultiBOT ETH — {{ base_token }}/{{ quote_token }} na {{ chain }}{% endblock %}
+{% block content %}
+
+<section class="toolbar">
+  <div class="pricebox">
+    <span class="label">{{ base_token }}/{{ quote_token }} · {{ chain }}</span>
+    <span id="ethmb-price" class="mono big">—</span>
+  </div>
+  <div class="actions">
+    <span id="ethmb-mode" class="mode-badge">—</span>
+    <label class="switch"><input type="checkbox" id="ethmb-show-hidden"><span>pokaż ukryte</span></label>
+    <a href="/eth" class="btn">⇄ Swap ręczny</a>
+    <button id="ethmb-refresh" class="btn">↻ Odśwież</button>
+  </div>
+</section>
+
+<div id="ethmb-rpc-note" class="rpc-note" style="display:none">
+  Publiczny RPC Base — dławi przy częstym odpytywaniu (HTTP 429).
+  Do zleceń w tle ustaw własny <code>EVM_RPC_URL</code>.
+</div>
+
+<div class="cols">
+  <section class="card">
+    <div class="card-head"><h2>⧉ Nowe zlecenie MultiBOT</h2></div>
+    <p class="muted small-note" style="margin-top:0">
+      Jedno duże zlecenie dzielone na <b>N transz</b> rozłożonych w oknie czasowym.
+      Transza wykona się na Uniswap v3, gdy spełni warunek wyzwalacza (czas i/lub cena).
+    </p>
+
+    <div id="ethmb-unavailable" class="muted" style="display:none"></div>
+
+    <form id="ethmb-form" class="trade-form-col">
+      <div class="seg" id="ethmb-side">
+        <button type="button" data-side="buy" class="on">KUPNO ({{ quote_token }} → {{ base_token }})</button>
+        <button type="button" data-side="sell">SPRZEDAŻ ({{ base_token }} → {{ quote_token }})</button>
+      </div>
+
+      <div class="form-grid2">
+        <label class="field">Klucz podpisujący<select id="ethmb-key"></select></label>
+        <label class="field">Ilość łączna <span id="ethmb-unit" class="muted">{{ quote_token }}</span>
+          <input id="ethmb-amount" type="number" step="any" required placeholder="np. 250"></label>
+        <label class="field">Liczba transz
+          <input id="ethmb-slices" type="number" step="1" min="1" max="{{ max_slices }}" value="5"></label>
+      </div>
+
+      <label class="field">Wyzwalacz transz
+        <div class="seg" id="ethmb-trigger">
+          <button type="button" data-trig="time_price" class="on">Czasowo-cenowy</button>
+          <button type="button" data-trig="time">Czasowy</button>
+          <button type="button" data-trig="price">Cenowy</button>
+        </div>
+      </label>
+      <div class="muted small-note" id="ethmb-trigger-help"></div>
+
+      <div class="form-grid2" id="ethmb-range-box">
+        <label class="field">Cena min ({{ quote_token }}/{{ base_token }})
+          <input id="ethmb-pmin" type="number" step="any" placeholder="bez ograniczenia"></label>
+        <label class="field">Cena max ({{ quote_token }}/{{ base_token }})
+          <input id="ethmb-pmax" type="number" step="any" placeholder="bez ograniczenia"></label>
+      </div>
+
+      <div class="form-grid2">
+        <label class="field">Start za (min)<input id="ethmb-start-in" type="number" step="1" min="0" value="0"></label>
+        <label class="field">Czas trwania (min)<input id="ethmb-window" type="number" step="1" min="1" value="30"></label>
+      </div>
+
+      <label class="field" id="ethmb-interval-box">Min. odstęp transz (min)
+        <input id="ethmb-interval" type="number" step="0.5" min="0" value="0"
+               placeholder="0 = bez odstępu">
+        <span class="muted small-note" id="ethmb-interval-help" style="margin:4px 0 0"></span>
+      </label>
+
+      <label class="field">Notatka<input id="ethmb-note" placeholder="opcjonalnie"></label>
+
+      <div id="ethmb-preview" class="trade-preview muted"></div>
+      <button class="btn primary" id="ethmb-submit">Uruchom MultiBOT</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>⌗ Podgląd planu transz</h2></div>
+    <div id="ethmb-plan" class="muted">Uzupełnij formularz, aby zobaczyć rozkład transz.</div>
+  </section>
+</div>
+
+<section class="card" id="ethmb-dist">
+  <div class="card-head">
+    <h2>⚖ Rozkład transz</h2>
+    <span class="muted small-note" style="margin:0">
+      Suwaki dzielą ilość, odstępy czasu i przesunięcie ceny pomiędzy transze.
+      <b>🔗 Łącz</b> w dwóch grupach sprzęga suwaki — ruch jednego przesuwa drugi.
+    </span>
+  </div>
+
+  <div class="dist-groups">
+    <div class="dist-group" data-group="size">
+      <div class="dist-head">
+        <b>Wielkość pozycji</b>
+        <span class="spacer"></span>
+        <button type="button" class="btn small" data-even="size">Równo</button>
+        <button type="button" class="btn small" data-mix="size">🎲 Mix</button>
+        <button type="button" class="btn small linkbtn" data-link="size"
+                title="Połącz suwaki z inną grupą">🔗 Łącz</button>
+      </div>
+      <div class="skew-lbl"><span>większe na początku</span><span>równo</span><span>większe na końcu</span></div>
+      <input type="range" class="skew" data-skew="size" min="-100" max="100" value="0">
+    </div>
+
+    <div class="dist-group" data-group="time">
+      <div class="dist-head">
+        <b id="ethmb-time-title">Czas — odstępy transz</b>
+        <span class="spacer"></span>
+        <button type="button" class="btn small" data-even="time">Równo</button>
+        <button type="button" class="btn small" data-mix="time">🎲 Mix</button>
+        <button type="button" class="btn small linkbtn" data-link="time"
+                title="Połącz suwaki z inną grupą">🔗 Łącz</button>
+      </div>
+      <div class="skew-lbl"><span>gęściej na początku</span><span>równo</span><span>gęściej na końcu</span></div>
+      <input type="range" class="skew" data-skew="time" min="-100" max="100" value="0">
+    </div>
+
+    <div class="dist-group" data-group="price">
+      <div class="dist-head">
+        <b>Przesunięcie ceny (%)</b>
+        <span class="spacer"></span>
+        <button type="button" class="btn small" data-even="price">Równo</button>
+        <button type="button" class="btn small" data-mix="price">🎲 Mix</button>
+        <button type="button" class="btn small linkbtn" data-link="price"
+                title="Połącz suwaki z inną grupą">🔗 Łącz</button>
+      </div>
+      <div class="skew-lbl"><span>niżej na początku</span><span>bez przesunięcia</span><span>wyżej na końcu</span></div>
+      <input type="range" class="skew" data-skew="price" min="-100" max="100" value="0">
+    </div>
+  </div>
+
+  <div id="ethmb-link-info" class="link-info"></div>
+  <div id="ethmb-rows"></div>
+</section>
+
+<section class="card">
+  <div class="card-head"><h2>☰ Zlecenia</h2></div>
+  <div id="ethmb-orders" class="muted">brak zleceń</div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  window.BASE_TOKEN = "{{ base_token }}";
+  window.QUOTE_TOKEN = "{{ quote_token }}";
+  window.CHAIN = "{{ chain }}";
+  window.MAX_SLICES = {{ max_slices }};
+</script>
+<script src="{{ url_for('static', filename='eth_multibot.js') }}"></script>
+{% endblock %}

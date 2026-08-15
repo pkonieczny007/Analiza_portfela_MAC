@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 portfel.db
+portfel_eth.db
 .env
 venv/
 prompt_folder/

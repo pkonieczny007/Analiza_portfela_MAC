@@ -24,20 +24,38 @@ log = logging.getLogger("portfel")
 app = Flask(__name__)
 dbm.init()
 
-# Zakladka ETH (Uniswap v3 na Base) — osobny blueprint, wlasne trasy /api/eth/*.
-# Import jest miekki: brak eth-account nie moze wywalic calej czesci X1.
-try:
-    from evm_api import bp as evm_bp
-    app.register_blueprint(evm_bp)
-    HAS_EVM = True
-except Exception as e:  # noqa: BLE001
-    logging.getLogger("portfel").warning("Zakladka ETH niedostepna: %s", e)
-    HAS_EVM = False
+# Zakladki ETH (Uniswap v3 na Base) — osobne blueprinty, wlasne trasy /api/eth/*.
+# Kazdy rejestrowany OSOBNO i miekko: brak eth-account albo blad w jednej
+# zakladce EVM nie moze zabrac ani czesci X1, ani pozostalych zakladek ETH.
+_EVM_PARTS = (
+    ("evm_api", "handel"),
+    ("evm_multibot_api", "multibot"),
+    ("evm_pary_api", "pary"),
+)
+HAS_EVM_PART: dict[str, bool] = {}
+
+for _mod_name, _part in _EVM_PARTS:
+    try:
+        _mod = __import__(_mod_name)
+        app.register_blueprint(_mod.bp)
+        HAS_EVM_PART[_part] = True
+    except Exception as _e:  # noqa: BLE001
+        logging.getLogger("portfel").warning(
+            "Zakladka ETH (%s) niedostepna: %s", _part, _e)
+        HAS_EVM_PART[_part] = False
+
+HAS_EVM = HAS_EVM_PART.get("handel", False)
+
+# Scheduler MultiBOT-a ETH startuje razem z tym od X1 — w __main__, nie przy
+# imporcie, inaczej odpalilby sie w kazdym workerze.
+if HAS_EVM_PART.get("multibot"):
+    import evm_config
+    import evm_multibot
 
 
 @app.context_processor
 def _inject_evm_flag():
-    return {"has_evm": HAS_EVM}
+    return {"has_evm": HAS_EVM, "has_evm_part": HAS_EVM_PART}
 
 # prosty cache ceny (RPC nie jest darmowe czasowo)
 _price_cache: dict = {"t": 0.0, "price": None, "xnt_usd": None}
@@ -772,4 +790,8 @@ def api_balances():
 if __name__ == "__main__":
     config.WALLET_DIR.mkdir(exist_ok=True)
     multibot.start_scheduler(_price_for)
+    if HAS_EVM_PART.get("multibot"):
+        # osobny watek dla Base — wlasny poll, bo publiczny RPC ma inne limity
+        evm_config.EVM_WALLET_DIR.mkdir(exist_ok=True)
+        evm_multibot.start_scheduler()
     app.run(host=config.UI_HOST, port=config.UI_PORT, debug=False)

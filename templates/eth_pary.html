@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Pary ETH — {{ base_token }}/{{ quote_token }} na {{ chain }}{% endblock %}
+{% block content %}
+
+<section class="toolbar">
+  <div class="pricebox">
+    <span class="label">{{ base_token }}/{{ quote_token }} · {{ chain }}</span>
+    <span id="ep-price" class="mono big">—</span>
+    <span id="ep-wallets-info" class="wallets-badge" title="zaznaczone portfele EVM (karta Portfele poniżej)"></span>
+  </div>
+  <div class="filterbox inline">
+    <span class="label">Zakres:</span>
+    <input type="date" id="ep-filter-from" title="od (włącznie) — ucina też sync">
+    <span class="muted">—</span>
+    <input type="date" id="ep-filter-to" title="do (włącznie)">
+    <button id="ep-filter-apply" class="btn small">Zastosuj</button>
+    <button id="ep-filter-today" class="btn small" title="pokazuj tylko od dziś">Od dziś</button>
+    <button id="ep-filter-clear" class="btn small">Wszystko</button>
+  </div>
+  <div class="actions">
+    <button id="ep-sync" class="btn primary">⛓ Synchronizuj z Base</button>
+    <button id="ep-automatch" class="btn">⚡ Auto-dopasuj (FIFO)</button>
+    <button id="ep-clear-matches" class="btn danger-ghost">✕ Wyczyść dopasowania</button>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>◎ Portfele EVM</h2>
+    <form id="ep-form-wallet" class="inline">
+      <input id="ep-wallet-addr" class="mono" placeholder="adres 0x…" size="44">
+      <input id="ep-wallet-name" placeholder="nazwa (opcjonalnie)" size="14">
+      <button class="btn small">+ Dodaj</button>
+    </form>
+  </div>
+  <div id="ep-wallets"></div>
+  <div id="ep-key-suggest" class="key-suggest"></div>
+</section>
+
+<section class="kpis" id="ep-kpis"></section>
+
+<section class="tabs" id="ep-tabs">
+  <button class="tab active" data-tab="aktywne">Aktywne</button>
+  <button class="tab" data-tab="zakonczone">Zakończone</button>
+  <button class="tab" data-tab="razem">Aktywne+Zakończone</button>
+  <button class="tab" data-tab="ukryte">Ukryte</button>
+  <button id="ep-unhide-all" class="btn small" style="display:none">↩ Przywróć wszystkie ukryte</button>
+</section>
+
+<div class="cols">
+  <section class="card">
+    <div class="card-head"><h2>Kupna {{ base_token }}</h2><span id="ep-buys-summary" class="muted"></span></div>
+    <table class="tbl" id="ep-tbl-buys">
+      <thead><tr>
+        <th>Data</th><th class="r">Ilość</th><th class="r">Cena</th><th class="r">Wartość</th>
+        <th>Sprzedano</th><th class="r">PnL zreal.</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Sprzedaże {{ base_token }}</h2><span id="ep-sells-summary" class="muted"></span></div>
+    <table class="tbl" id="ep-tbl-sells">
+      <thead><tr>
+        <th>Data</th><th class="r">Ilość</th><th class="r">Cena</th><th class="r">Wartość</th>
+        <th>Dopasowano</th><th class="r">PnL zreal.</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head"><h2>Ręczne dopasowanie</h2></div>
+  <form id="ep-form-match" class="inline">
+    <b>Dopasuj parę:</b>
+    <select id="ep-match-buy"></select>
+    <select id="ep-match-sell"></select>
+    <input id="ep-match-qty" type="number" step="any" placeholder="ilość (puste = max)">
+    <button class="btn small">Połącz</button>
+  </form>
+</section>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  window.EP_BASE = "{{ base_token }}";
+  window.EP_QUOTE = "{{ quote_token }}";
+</script>
+<script src="{{ url_for('static', filename='eth_pary.js') }}"></script>
+{% endblock %}
