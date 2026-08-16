@@ -1,2 +1,8 @@
 flask>=3.0
 requests>=2.31
+
+# Opcjonalne — patrz README, sekcja "Instalacja / 4. Zaleznosci".
+# Brak ktorejkolwiek nie wywala aplikacji, tylko wylacza kawalek funkcji.
+#
+# eth-account>=0.13   # zakladki ETH (Base): bez tego nie pokaza sie wcale
+# solders>=0.21       # handel na X1/XDEX: bez tego zakladki X1 sa tylko do odczytu
