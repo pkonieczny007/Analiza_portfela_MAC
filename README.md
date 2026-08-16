@@ -2,7 +2,7 @@
 
 ---
 
-## 🚀 Szybki start dla laika — MultiBOT ETH (Base) krok po kroku
+## 🚀 Szybki start — MultiBOT ETH (Base) krok po kroku
 
 Instrukcja „otwórz, wklej, działa". Zakłada **macOS** (na Windows patrz uwaga
 na końcu) i to, że nie znasz się na programowaniu. Zajmuje ok. 10 minut.
