@@ -1,5 +1,146 @@
 # Analiza portfela MAC
 
+---
+
+## 🚀 Szybki start dla laika — MultiBOT ETH (Base) krok po kroku
+
+Instrukcja „otwórz, wklej, działa". Zakłada **macOS** (na Windows patrz uwaga
+na końcu) i to, że nie znasz się na programowaniu. Zajmuje ok. 10 minut.
+
+**Co musisz mieć wcześniej:** portfel (np. Rabby) na sieci **Base**, a w nim
+trochę **ETH na gaz** (wystarczy równowartość ~2 $) i **USDC**, za które będziesz
+kupować. Środki muszą być na sieci Base, nie na Ethereum.
+
+### Krok 1 — otwórz Terminal
+
+Naciśnij `Cmd` + `Spacja`, wpisz **Terminal**, `Enter`. Otworzy się czarne/białe
+okno na tekst. Wszystko poniżej wklejasz właśnie tam (`Cmd`+`V`) i zatwierdzasz
+`Enter`.
+
+### Krok 2 — pobierz program i zainstaluj (wklej CAŁY blok naraz)
+
+```bash
+cd ~/Documents
+git clone https://github.com/pkonieczny007/Analiza_portfela_MAC.git
+cd Analiza_portfela_MAC
+git checkout eth
+python3 -m venv venv
+./venv/bin/pip install -r requirements.txt eth-account
+```
+
+Poleci kilkadziesiąt linii tekstu — to normalne. Ma się skończyć bez słowa
+`ERROR`. Jeśli system poprosi o doinstalowanie „narzędzi wiersza poleceń"
+(Xcode Command Line Tools) — zgódź się i po instalacji wklej blok ponownie.
+
+> Robisz to **raz**. Przy kolejnych uruchomieniach zaczynasz od kroku 5.
+
+### Krok 3 — wyciągnij klucz prywatny z Rabby
+
+W rozszerzeniu Rabby:
+
+1. Kliknij swój adres / awatar u góry, żeby zobaczyć **listę adresów**.
+2. Przy adresie, którym chcesz handlować, kliknij **⋯** (trzy kropki) lub ikonę
+   ustawień → **Backup Private Key** („Kopia klucza prywatnego").
+3. Podaj **hasło do Rabby**, potwierdź ostrzeżenie i **skopiuj** klucz.
+   To ciąg 64 znaków (cyfry i litery a–f), zwykle zaczynający się od `0x`.
+
+> ⚠️ **Kto ma ten klucz, ma Twoje pieniądze.** Nie wysyłaj go nikomu, nie wklejaj
+> na czacie ani w przeglądarce. Zacznij od **świeżego portfela z małą kwotą**,
+> a nie od tego, na którym trzymasz oszczędności.
+
+### Krok 4 — zapisz klucz do programu (wklej blok, potem klucz)
+
+```bash
+cd ~/Documents/Analiza_portfela_MAC
+mkdir -p wallet_evm
+nano wallet_evm/moj-klucz.txt
+```
+
+Otworzy się prosty edytor w terminalu:
+
+1. Wklej klucz (`Cmd`+`V`) — ma być **sam klucz, jedna linia, nic więcej**.
+2. `Ctrl`+`O`, potem `Enter` — zapis.
+3. `Ctrl`+`X` — wyjście.
+
+Na koniec zabezpiecz plik przed innymi użytkownikami komputera:
+
+```bash
+chmod 600 wallet_evm/moj-klucz.txt
+```
+
+Katalog `wallet_evm/` jest w `.gitignore`, więc klucz nigdy nie trafi na GitHuba.
+
+### Krok 5 — uruchom program
+
+```bash
+cd ~/Documents/Analiza_portfela_MAC
+./venv/bin/python app.py
+```
+
+Terminal wypisze `Running on http://127.0.0.1:5006` i **zostanie zajęty** — tak
+ma być, to działający serwer. Nie zamykaj tego okna, dopóki korzystasz z bota.
+
+Teraz otwórz w przeglądarce:
+
+**<http://127.0.0.1:5006/eth/multibot>**
+
+### Krok 6 — ustaw zlecenie MultiBOT
+
+W karcie **⧉ Nowe zlecenie MultiBOT**:
+
+1. **KUPNO / SPRZEDAŻ** — kupno wydaje USDC, sprzedaż wydaje WETH.
+2. **Klucz podpisujący** — wybierz `moj-klucz` (nazwa Twojego pliku). Obok
+   zobaczysz adres `0x…` — sprawdź, czy zgadza się z adresem z Rabby.
+3. **Ilość łączna** — np. `250` (to USDC przy kupnie).
+4. **Liczba transz** — na ile kawałków podzielić zakup, np. `5`.
+5. **Wyzwalacz transz** — `Czasowy` (kupuj po kolei w czasie), `Cenowy`
+   (kupuj, gdy cena wejdzie w widełki) albo `Czasowo-cenowy` (oba warunki).
+6. **Start za (min)** i **Czas trwania (min)** — np. `0` i `30`: pięć transz
+   rozłożonych na najbliższe pół godziny.
+7. **Min. odstęp transz (min)** — bezpiecznik przy trybie cenowym, żeby
+   wszystkie transze nie wystrzeliły w tej samej sekundzie. Zostaw np. `1`.
+8. **⚖ Rozkład transz** (opcjonalnie) — suwaki decydują, czy transze mają być
+   równe, czy np. większe na początku. Nie musisz ich ruszać.
+
+Karta **⌗ Podgląd planu transz** pokazuje na żywo, o której godzinie i za ile
+poleci każda transza. Kliknij **Uruchom MultiBOT**.
+
+### Krok 7 — najpierw na sucho, dopiero potem naprawdę
+
+U góry strony jest plakietka trybu:
+
+- **DRY-RUN** (domyślnie) — bot udaje: liczy, planuje i zapisuje transze, ale
+  **nie wydaje ani centa**. Tu sprawdzasz, czy wszystko ustawiłeś dobrze.
+- **LIVE — realne środki** — bot wydaje prawdziwe pieniądze.
+
+Przełącznik jest na zakładce **ETH** (<http://127.0.0.1:5006/eth>), pole
+„tryb DRY-RUN" — MultiBOT dziedziczy to ustawienie. Wyłączenie DRY-RUN wymaga
+potwierdzenia w okienku. **Pierwsze prawdziwe zlecenie zrób na małą kwotę.**
+
+### Krok 8 — zatrzymanie
+
+Kliknij w okno Terminala i naciśnij `Ctrl`+`C`. Serwer się zatrzyma, a wraz
+z nim MultiBOT — **niewykonane transze nie polecą, gdy program nie działa**.
+Zamknięcie samej przeglądarki nie zatrzymuje bota.
+
+### Gdy coś nie działa
+
+| Objaw | Co zrobić |
+|---|---|
+| W menu nie ma zakładek „ETH" | Nie zainstalowało się `eth-account` — wklej `./venv/bin/pip install eth-account` i uruchom program ponownie |
+| `Address already in use` przy starcie | Stary serwer jeszcze chodzi: `lsof -ti tcp:5006 \| xargs kill`, potem uruchom ponownie |
+| Na liście „Klucz podpisujący" pusto | Plik nie leży w `wallet_evm/`, jest pusty albo klucz nie ma 64 znaków — sprawdź krok 4 |
+| Błędy `429` / „RPC dławi" | Publiczny endpoint Base ma limity. Załóż darmowe konto w Alchemy i uruchamiaj: `EVM_RPC_URL=https://twoj-adres ./venv/bin/python app.py` |
+| Transza ma status `skipped` | Warunek (cena albo odstęp) nie zdążył się spełnić do końca okna — przy zleceniu widać powód |
+
+**Windows:** zamiast Terminala otwórz **PowerShell**, w kroku 2 użyj
+`py -3 -m venv venv` i `.\venv\Scripts\pip install -r requirements.txt eth-account`,
+a program uruchamiaj przez `.\venv\Scripts\python app.py`. Klucz zapisz
+Notatnikiem do pliku `wallet_evm\moj-klucz.txt` (upewnij się, że nie dostał
+ukrytego rozszerzenia `.txt.txt`).
+
+---
+
 Narzędzie do śledzenia transakcji, parowania kupno–sprzedaż i handlu
 w **dwóch sieciach naraz**:
 
@@ -19,7 +160,10 @@ surowy JSON-RPC.
 
 ---
 
-## Instalacja
+## Instalacja (szczegółowo)
+
+Wersja pełna — obie sieci, wszystkie warianty. Jeśli chcesz tylko odpalić
+MultiBOT-a na Base, wystarczy [szybki start](#-szybki-start-dla-laika--multibot-eth-base-krok-po-kroku) wyżej.
 
 ### 1. Wymagania
 
